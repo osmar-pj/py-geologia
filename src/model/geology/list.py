@@ -24,6 +24,8 @@ def getGeology():
     # convertir a int el level
     df_reportes['level'] = df_reportes['level'].astype(int)
 
+    #
+    df_reportes['year'] = df_reportes['year'].astype(str)
 
     df_reportes['ton'].fillna(0, inplace=True)
     df_reportes['tonh'].fillna(0, inplace=True)
