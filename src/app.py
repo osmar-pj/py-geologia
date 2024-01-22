@@ -507,12 +507,40 @@ def geo_analysis():
     data = request.get_json()
     arr = data['arr']
     
-    df_geology, df_columns = getGeology()
+    df_geology, df_main = getGeology()
     
     df_result = df_geology.groupby(arr).agg({'ton': 'sum', 'tonh': 'sum','ley_ag': 'mean', 'ley_fe': 'mean', 'ley_mn': 'mean', 'ley_pb': 'mean', 'ley_zn': 'mean'}).reset_index()
     result = df_result.to_dict('records')
     
     return jsonify(result)
+
+@app.route('/analysis2', methods=['GET'])
+def geo_analysis2():
+    ts = request.args.get('ts')
+    mining = request.args.get('mining')
+    df_geology, df_main = getGeology()
+    months = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO','JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE','DICIEMBRE']
+    idxMonth = datetime.fromtimestamp(int(ts)).month - 1
+    month = months[idxMonth]
+    year = datetime.fromtimestamp(int(ts)).strftime('%Y')
+    df_main['tonh*ley_ag'] = df_main['tonh'] * df_main['ley_ag']
+    df_main['tonh*ley_fe'] = df_main['tonh'] * df_main['ley_fe']
+    df_main['tonh*ley_mn'] = df_main['tonh'] * df_main['ley_mn']
+    df_main['tonh*ley_pb'] = df_main['tonh'] * df_main['ley_pb']
+    df_main['tonh*ley_zn'] = df_main['tonh'] * df_main['ley_zn']
+    df1 = df_main.query('month == @month and year == @year and mining == @mining').groupby(['date_extraction']).agg({'tonh': 'sum', 'tonh*ley_ag': 'sum', 'tonh*ley_fe': 'sum', 'tonh*ley_mn': 'sum', 'tonh*ley_pb': 'sum', 'tonh*ley_zn': 'sum' }).reset_index()
+    df1['Ag'] = df1['tonh*ley_ag'] / df1['tonh']
+    df1['Fe'] = df1['tonh*ley_fe'] / df1['tonh']
+    df1['Mn'] = df1['tonh*ley_mn'] / df1['tonh']
+    df1['Pb'] = df1['tonh*ley_pb'] / df1['tonh']
+    df1['Zn'] = df1['tonh*ley_zn'] / df1['tonh']
+    df1.dropna(inplace=True)
+    df1['date_extraction'] = pd.to_datetime(df1['date_extraction'], format='%d/%m/%Y')
+    df1['timestamp'] = df1['date_extraction'].apply(lambda x: datetime.strptime(x.strftime('%d/%m/%Y'), '%d/%m/%Y').timestamp())
+    df1.sort_values(by=['timestamp'], inplace=True)
+    result = df1.to_dict('records')
+    return jsonify(result)
+
 
 @app.route('/update', methods=['GET'])
 def update():

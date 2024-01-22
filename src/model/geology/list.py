@@ -60,7 +60,7 @@ def getGeology():
     # df_reportes.groupby(['date_extraction','mining', 'month', 'year']).agg({'ton': 'sum', 'tonh': 'sum','ley_ag': 'mean', 'ley_fe': 'mean', 'ley_mn': 'mean', 'ley_pb': 'mean', 'ley_zn': 'mean'})
 
     df_reportes['date_extraction'] = pd.to_datetime(df_reportes['date_extraction']).dt.strftime('%d/%m/%Y')
-
+    df_reportes['timestamp'] = df_reportes['date_extraction'].apply(lambda x: datetime.strptime(x, '%d/%m/%Y').timestamp())
     df_reportes['month'] = df_reportes['month'].replace('0CTUBRE', 'OCTUBRE')
 
     df_reportes['veta'] = df_reportes['veta'].replace('VANESA', 'Vanessa')

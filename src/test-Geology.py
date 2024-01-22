@@ -1,5 +1,5 @@
 from flask import Flask, jsonify, request, Response
-from flask_pymongo import PyMongo
+# from flask_pymongo import PyMongo
 from datetime import datetime
 from pymongo import MongoClient
 from datetime import datetime, timedelta
@@ -17,6 +17,9 @@ pd.set_option('display.max_columns', None)
 # pd.set_option('display.max_rows', None)
 
 df_reportes = pd.read_csv('../data/reportes.csv')
+df_prog = pd.read_csv('../data/prog.csv')
+df_prog['date_extraction'] = pd.to_datetime(df_prog['date'])
+df_prog['year'] = df_prog['year'].astype(str)
 
 df_reportes.rename(columns={'MES': 'month', 'FECHA EXTRACCION': 'date_extraction', 'Año': 'year', 'ESTADO': 'status', 'UBICACIÓN': 'ubication', 'TURNO': 'turn', 'ZONA': 'mining', 'EMPRESA': 'company', 'NIVEL': 'level', 'TIPO': 'type', 'Veta': 'veta', 'Tajo': 'tajo', 'Dominio': 'dominio', 't': 'ton', 'TMH': 'tonh', 'N° carros': 'vagones', 'Ley Stope': 'ley_stope', 'CODIGO MUESTRA': 'cod_muestra', 'LEY SO': 'ley_so', 'LEY CANCHA Ag': 'ley_ag', 'LEY CANCHA Fe': 'ley_fe', 'LEY CANCHA Mn': 'ley_mn', 'LEY CANCHA Pb': 'ley_pb', 'LEY CANCHA Zn': 'ley_zn', 'Ley Original': 'ley_original', 'Ley cancha 2': 'ley_cancha2', 'Codigo Muestra 3': 'cod_muestra3', 'Ley cancha 3': 'ley_cancha3', 'LEY CANCHA castigada': 'ley_cancha_castigada', 'LEY inicial': 'ley_inicial', 'Rango': 'rango', 'Ag*TMH': 'tmh_ag', 'Fe*TMH': 'tmh_fe', 'Mn*TMH': 'tmh_mn', 'Pb*TMH': 'tmh_pb', 'Zn*TMH': 'tmh_zn', 'Codigo tableta': 'cod_tableta', 'Labor Rep.': 'labor', 'FECHA ABASTECIMIENTO': 'date_abas', 'Columna1': 'columna'}, inplace=True)
 
@@ -24,6 +27,8 @@ df_reportes['mining'] = df_reportes['mining'].replace('Yumpag', 'YUMPAG')
 
 df_reportes['turn'].fillna('SIN TURNO', inplace=True)
 df_reportes['level'].fillna(0, inplace=True)
+
+df_reportes['year'] = df_reportes['year'].astype(str)
 
 # convertir a int el level
 df_reportes['level'] = df_reportes['level'].astype(int)
@@ -62,6 +67,7 @@ df_reportes['columna'].fillna('--', inplace=True)
 # df_reportes.groupby(['date_extraction','mining', 'month', 'year']).agg({'ton': 'sum', 'tonh': 'sum','ley_ag': 'mean', 'ley_fe': 'mean', 'ley_mn': 'mean', 'ley_pb': 'mean', 'ley_zn': 'mean'})
 
 df_reportes['date_extraction'] = pd.to_datetime(df_reportes['date_extraction']).dt.strftime('%d/%m/%Y')
+df_reportes['timestamp'] = df_reportes['date_extraction'].apply(lambda x: datetime.strptime(x, '%d/%m/%Y').timestamp())
 
 df_reportes['month'] = df_reportes['month'].replace('0CTUBRE', 'OCTUBRE')
 
@@ -189,3 +195,45 @@ df = df_reportes.groupby(array).agg(ton=('ton', 'sum'), tonh=('tonh', 'sum'), le
 
 #to dict
 df = df.to_dict('records')
+# 1698814800
+ts = '1704085200'
+mining = 'YUMPAG'
+date = datetime.fromtimestamp(int(ts)).strftime("%d/%m/%Y")
+months = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO','JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE','DICIEMBRE']
+idxMonth = datetime.fromtimestamp(int(ts)).month - 1
+month = months[idxMonth]
+year = datetime.fromtimestamp(int(ts)).strftime('%Y')
+
+df_main['tonh*ley_ag'] = df_main['tonh'] * df_main['ley_ag']
+df_main['tonh*ley_fe'] = df_main['tonh'] * df_main['ley_fe']
+df_main['tonh*ley_mn'] = df_main['tonh'] * df_main['ley_mn']
+df_main['tonh*ley_pb'] = df_main['tonh'] * df_main['ley_pb']
+df_main['tonh*ley_zn'] = df_main['tonh'] * df_main['ley_zn']
+df1 = df_main.query('month == @month and year == @year and mining == @mining').groupby(['date_extraction']).agg({'tonh': 'sum', 'tonh*ley_ag': 'sum', 'tonh*ley_fe': 'sum', 'tonh*ley_mn': 'sum', 'tonh*ley_pb': 'sum', 'tonh*ley_zn': 'sum' }).reset_index()
+df1['Ag'] = df1['tonh*ley_ag'] / df1['tonh']
+df1['Fe'] = df1['tonh*ley_fe'] / df1['tonh']
+df1['Mn'] = df1['tonh*ley_mn'] / df1['tonh']
+df1['Pb'] = df1['tonh*ley_pb'] / df1['tonh']
+df1['Zn'] = df1['tonh*ley_zn'] / df1['tonh']
+# date_extraction to datetime firstday
+df1['date_extraction'] = pd.to_datetime(df1['date_extraction'], format='%d/%m/%Y')
+# df1['timestamp'] = df1['date_extraction'].apply(lambda x: datetime.strptime(x.strftime('%d/%m/%Y'), '%d/%m/%Y').timestamp())
+# # sort by timestamp
+# df1.sort_values(by=['timestamp'], inplace=True)
+
+df2 = df_prog.query('mining == @mining and month == @month and year == @year')
+
+# merge df2 and df1
+df3 = pd.merge(df2, df1, on='date_extraction', how='left')
+df3['timestamp'] = df3['date_extraction'].apply(lambda x: datetime.strptime(x.strftime('%d/%m/%Y'), '%d/%m/%Y').timestamp())
+# # sort by timestamp
+df3.sort_values(by=['timestamp'], inplace=True)
+df3.fillna(0, inplace=True)
+
+# 1693544400 SEPTIEMBRE 2023
+# 1696136400 OCTUBRE 2023 (OK)
+# 1698814800 NOVIEMBRE 2023 (OK)
+# 1701406800 DICIEMBRE 2023
+# 1704085200 ENERO 2024
+
+# 1698814800 NOVIEMBRE 2023

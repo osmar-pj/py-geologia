@@ -1,0 +1,10 @@
+Dockerfile
+.env
+
+venv/
+
+data/
+
+# .gitignore
+
+# .dockerignore
