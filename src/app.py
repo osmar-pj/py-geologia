@@ -423,9 +423,9 @@ def tripGeology():
     
     df_tripsTruck['weightTotalTMS'] = (df_tripsTruck['weightTotal'] * 0.94).round(1)
     df_tripsTruck['material'] = np.select([(df_tripsTruck['mineral'] > 0) & (df_tripsTruck['desmonte'] == 0), (df_tripsTruck['desmonte'] > 0) & (df_tripsTruck['mineral'] == 0), (df_tripsTruck['mineral'] > 0) & (df_tripsTruck['desmonte'] > 0)], ['MINERAL', 'DESMONTE', 'MIXTO'], default='OTRO')
-    df_tripsTruck = df_tripsTruck[['_id', 'date', 'turno', 'name', 'tag', 'mining', 'type', 'tajo', 'weightTotal', 'weightTotalTMS', 'material', 'hhmm', 'status', 'valid', 'createdAt']]
+    df_tripsTruck = df_tripsTruck[['_id', 'date_extraction', 'turn', 'name', 'tag', 'mining', 'type', 'tajo', 'weightTotal', 'weightTotalTMS', 'dominio', 'hhmm', 'status', 'valid', 'createdAt']]
     # df_tripsTruck.sort_values(by='createdAt', ascending=False, inplace=True)
-    df_tripsTruck.rename(columns={'_id': 'travel_Id', 'date': 'fecha', 'turno': 'turno', 'name': 'operador', 'tag': 'vehiculo', 'mining': 'mina', 'type': 'tipo', 'tajo': 'tajo', 'weightTotal': 'ton', 'weightTotalTMS': 'tonh', 'material': 'material', 'hhmm': 'hora', 'status': 'statusMina', 'valid': 'validMina', 'createdAt': 'datetime'}, inplace=True)
+    # df_tripsTruck.rename(columns={'_id': 'travel_Id', 'date': 'fecha', 'turno': 'turno', 'name': 'operador', 'tag': 'vehiculo', 'mining': 'mina', 'type': 'tipo', 'tajo': 'tajo', 'weightTotal': 'ton', 'weightTotalTMS': 'tonh', 'material': 'material', 'hhmm': 'hora', 'status': 'statusMina', 'valid': 'validMina', 'createdAt': 'datetime'}, inplace=True)
     # fecha_hoy = datetime.now().strftime('%d/%m/%Y')
     # df_tripsTruck = df_tripsTruck.query('fecha == @fecha_hoy')
     truck = df_tripsTruck.to_dict('records')
@@ -437,8 +437,8 @@ def tripGeology():
     df_tripsWagon['valid'] = np.where(df_tripsWagon['status'] == 'completo', 1, 0)
     df_tripsWagon['weightTotalTMS'] = (df_tripsWagon['weight'] * 0.94).round(1)
     df_tripsWagon['material'] = np.select([(df_tripsWagon['mineral'] > 0) & (df_tripsWagon['desmonte'] == 0), (df_tripsWagon['desmonte'] > 0) & (df_tripsWagon['mineral'] == 0), (df_tripsWagon['mineral'] > 0) & (df_tripsWagon['desmonte'] > 0)], ['MINERAL', 'DESMONTE', 'MIXTO'], default='OTRO')
-    df_tripsWagon = df_tripsWagon[['_id', 'date', 'turno', 'name', 'tag', 'mining', 'totalValidWagons', 'weight', 'weightTotalTMS', 'material', 'hhmm', 'status', 'valid', 'createdAt']]
-    df_tripsWagon.rename(columns={'_id': 'travel_Id', 'date': 'fecha', 'turno': 'turno', 'name': 'operador', 'tag': 'vehiculo', 'mining': 'mina', 'totalValidWagons': 'vagones','weight': 'ton', 'weightTotalTMS': 'tonh', 'material': 'material', 'hhmm': 'hora', 'status': 'statusMina', 'valid': 'validMina','createdAt': 'datetime'}, inplace=True)
+    df_tripsWagon = df_tripsWagon[['_id', 'date_extraction', 'turn', 'name', 'tag', 'mining', 'totalValidWagons', 'weight', 'weightTotalTMS', 'dominio', 'hhmm', 'status', 'valid', 'createdAt']]
+    # df_tripsWagon.rename(columns={'_id': 'travel_Id', 'date': 'fecha', 'turno': 'turno', 'name': 'operador', 'tag': 'vehiculo', 'mining': 'mina', 'totalValidWagons': 'vagones','weight': 'ton', 'weightTotalTMS': 'tonh', 'material': 'material', 'hhmm': 'hora', 'status': 'statusMina', 'valid': 'validMina','createdAt': 'datetime'}, inplace=True)
     wagon = df_tripsWagon.to_dict('records')
     
     df_total = pd.concat([df_tripsTruck, df_tripsWagon])
@@ -448,8 +448,8 @@ def tripGeology():
     df_total = df_total.fillna('')
 
     df_total.sort_values(by='datetime', ascending=True, inplace=True)
-    
-    total = df_total.to_dict('records')
+    # control de envio de datos
+    total = df_total.head(10).to_dict('records')
     
     return jsonify({'total': total})
 
@@ -462,7 +462,7 @@ def dataGeology():
     # periodo = request.args.get('period')
     # value = request.args.get('value')
     
-    df_geology, df_columns = getGeology()
+    df_geology, df_columns, df_prog = getGeology()
     
     year = df_geology['year'].unique().tolist()
     month = df_geology['month'].unique().tolist()
@@ -503,49 +503,103 @@ def dataGeology():
 
 @app.route('/analysis', methods=['POST'])
 def geo_analysis():
-    
+    # Para la tabla dinamica
     data = request.get_json()
+    df_geology, df_main, df_prog = getGeology()
     arr = data['arr']
-    
-    df_geology, df_main = getGeology()
-    
-    df_result = df_geology.groupby(arr).agg({'ton': 'sum', 'tonh': 'sum','ley_ag': 'mean', 'ley_fe': 'mean', 'ley_mn': 'mean', 'ley_pb': 'mean', 'ley_zn': 'mean'}).reset_index()
-    result = df_result.to_dict('records')
-    
-    return jsonify(result)
+    if len(arr) == 0:
+        result = df_main.head(30).to_dict('records')
+    else:
+        month = 'month'
+        idx = [i for i, s in enumerate(arr) if month in s]
+        nro_month = 'nro_month'
+        if len(idx) > 0:
+            arr.insert(idx[0], nro_month)
+        df_result = df_geology.groupby(arr).agg(ton=('ton', 'sum'), tonh=('tonh', 'sum'), ley_ag=('ley_ag', 'mean'), ley_fe=('ley_fe', 'mean'), ley_mn=('ley_mn', 'mean'), ley_pb=('ley_pb', 'mean'), ley_zn=('ley_zn', 'mean'), tmh_ag=('tmh_ag', 'sum'), tmh_fe=('tmh_fe', 'sum'), tmh_mn=('tmh_mn', 'sum'), tmh_pb=('tmh_pb', 'sum'), tmh_zn=('tmh_zn', 'sum')).reset_index()
+        result = df_result.to_dict('records')
 
+    return jsonify(result)
 @app.route('/analysis2', methods=['GET'])
 def geo_analysis2():
     ts = request.args.get('ts')
     mining = request.args.get('mining')
-    df_geology, df_main = getGeology()
+    df_geology, df_main, df_prog = getGeology()
     months = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO','JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE','DICIEMBRE']
     idxMonth = datetime.fromtimestamp(int(ts)).month - 1
     month = months[idxMonth]
     year = datetime.fromtimestamp(int(ts)).strftime('%Y')
-    df_main['tonh*ley_ag'] = df_main['tonh'] * df_main['ley_ag']
-    df_main['tonh*ley_fe'] = df_main['tonh'] * df_main['ley_fe']
-    df_main['tonh*ley_mn'] = df_main['tonh'] * df_main['ley_mn']
-    df_main['tonh*ley_pb'] = df_main['tonh'] * df_main['ley_pb']
-    df_main['tonh*ley_zn'] = df_main['tonh'] * df_main['ley_zn']
-    df1 = df_main.query('month == @month and year == @year and mining == @mining').groupby(['date_extraction']).agg({'tonh': 'sum', 'tonh*ley_ag': 'sum', 'tonh*ley_fe': 'sum', 'tonh*ley_mn': 'sum', 'tonh*ley_pb': 'sum', 'tonh*ley_zn': 'sum' }).reset_index()
-    df1['Ag'] = df1['tonh*ley_ag'] / df1['tonh']
-    df1['Fe'] = df1['tonh*ley_fe'] / df1['tonh']
-    df1['Mn'] = df1['tonh*ley_mn'] / df1['tonh']
-    df1['Pb'] = df1['tonh*ley_pb'] / df1['tonh']
-    df1['Zn'] = df1['tonh*ley_zn'] / df1['tonh']
-    df1.dropna(inplace=True)
+    df_main['tonh_ley_ag'] = df_main['tonh'] * df_main['ley_ag']
+    df_main['tonh_ley_fe'] = df_main['tonh'] * df_main['ley_fe']
+    df_main['tonh_ley_mn'] = df_main['tonh'] * df_main['ley_mn']
+    df_main['tonh_ley_pb'] = df_main['tonh'] * df_main['ley_pb']
+    df_main['tonh_ley_zn'] = df_main['tonh'] * df_main['ley_zn']
+    df1 = df_main.query('month == @month and year == @year and mining == @mining').groupby(['date_extraction']).agg({'tonh': 'sum', 'tonh_ley_ag': 'sum', 'tonh_ley_fe': 'sum', 'tonh_ley_mn': 'sum', 'tonh_ley_pb': 'sum', 'tonh_ley_zn': 'sum' }).reset_index()
+    df1['Ag'] = df1['tonh_ley_ag'] / df1['tonh']
+    df1['Fe'] = df1['tonh_ley_fe'] / df1['tonh']
+    df1['Mn'] = df1['tonh_ley_mn'] / df1['tonh']
+    df1['Pb'] = df1['tonh_ley_pb'] / df1['tonh']
+    df1['Zn'] = df1['tonh_ley_zn'] / df1['tonh']
+    # date_extraction to datetime firstday
     df1['date_extraction'] = pd.to_datetime(df1['date_extraction'], format='%d/%m/%Y')
-    df1['timestamp'] = df1['date_extraction'].apply(lambda x: datetime.strptime(x.strftime('%d/%m/%Y'), '%d/%m/%Y').timestamp())
-    df1.sort_values(by=['timestamp'], inplace=True)
-    result = df1.to_dict('records')
-    return jsonify(result)
+    df2 = df_prog.query('mining == @mining and month == @month and year == @year')
+    if len(df2) == 0:
+        df3 = df1.copy()
+        df3['timestamp'] = df3['date_extraction'].apply(lambda x: datetime.strptime(x.strftime('%d/%m/%Y'), '%d/%m/%Y').timestamp())
+        df3['ton_prog'] = 0
+        df3['ley_prog'] = 0
+        df3.sort_values(by=['timestamp'], inplace=True)
+    else:
+        df3 = pd.merge(df2, df1, on='date_extraction', how='left')
+        df3['timestamp'] = df3['date_extraction'].apply(lambda x: datetime.strptime(x.strftime('%d/%m/%Y'), '%d/%m/%Y').timestamp())
+        df3.sort_values(by=['timestamp'], inplace=True)
+        df3.replace(np.nan, None, inplace=True)
+    total_ton_prog = df3['ton_prog'].sum()
+    total_ton = df3['tonh'].sum()
+    aver_ley_prog = (df3['ton_prog'] * df3['ley_prog']).sum() / df3['ton_prog'].sum()
+    aver_ley = (df3['tonh'] * df3['Ag']).sum() / df3['tonh'].sum()
 
+    meta = {
+        'total_ton_prog': total_ton_prog,
+        'total_ton': total_ton,
+        'aver_ley_prog': aver_ley_prog,
+        'aver_ley': aver_ley
+    }
+    result = df3.to_dict('records')
+    return jsonify({
+        'meta': meta,
+        'result': result
+    })
+
+@app.route('/list_geology', methods=['GET'])
+def list_geology():
+    df_geology, df_main, df_prog = getGeology()
+    trips = db['listtrips']
+    df_trips = pd.DataFrame(list(trips.find()))
+    df_trips['_id'] = df_trips['_id']
+    df_main = df_trips.query('status != "Planta"')
+    df_main.sort_values(by=['timestamp'], ascending=False, inplace=True)
+    main = df_main.to_dict('records')
+    return jsonify(main)
+    
+
+@app.route('/ruma', methods=['GET'])
+def rumas():
+    # df_geology, df_main, df_prog = getGeology()
+    rumas = db['rumas']
+    df_ruma = pd.DataFrame(list(rumas.find()))
+    # trips = db['listtrips']
+    # df_trips = pd.DataFrame(list(trips.find()))
+    # df_trips['_id'] = df_trips['_id']
+    # df_cancha= df_trips.query('status != "Planta"')
+    # df_ruma = df_cancha.groupby(['ubication', 'mining', 'dominio', 'cod_tableta']).agg({'tonh': 'sum', 'tmh_ag': 'sum', 'tajo': ['unique']}).reset_index()
+    # df_ruma.columns = ['ubication', 'mining', 'dominio', 'cod_tableta', 'tonh', 'tmh_ag', 'tajo']
+    # df_ruma['ley_ag'] = df_ruma['tmh_ag'] / df_ruma['tonh']
+    ruma = df_ruma.to_json(orient='records')
+    return jsonify(ruma)
 
 @app.route('/update', methods=['GET'])
 def update():
     df_trips = getTripsTruck()
-    
     return jsonify({'data': 'updated'})
 
 @app.errorhandler(404)

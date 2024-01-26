@@ -13,8 +13,11 @@ client = MongoClient(os.getenv('MONGO_URI'))
 db = client['wapsi']
 
 def getGeology():
+    df_prog = pd.read_csv('./data/prog.csv')
+    df_prog['date'] = pd.to_datetime(df_prog['date'])
+    df_prog['year'] = df_prog['year'].astype(str)
     df_reportes = pd.read_csv('./data/reportes.csv')
-    df_reportes.rename(columns={'MES': 'month', 'FECHA EXTRACCION': 'date_extraction', 'Año': 'year', 'ESTADO': 'status', 'UBICACIÓN': 'ubication', 'TURNO': 'turn', 'ZONA': 'mining', 'EMPRESA': 'company', 'NIVEL': 'level', 'TIPO': 'type', 'Veta': 'veta', 'Tajo': 'tajo', 'Dominio': 'dominio', 't': 'ton', 'TMH': 'tonh', 'N° carros': 'vagones', 'Ley Stope': 'ley_stope', 'CODIGO MUESTRA': 'cod_muestra', 'LEY SO': 'ley_so', 'LEY CANCHA Ag': 'ley_ag', 'LEY CANCHA Fe': 'ley_fe', 'LEY CANCHA Mn': 'ley_mn', 'LEY CANCHA Pb': 'ley_pb', 'LEY CANCHA Zn': 'ley_zn', 'Ley Original': 'ley_original', 'Ley cancha 2': 'ley_cancha2', 'Codigo Muestra 3': 'cod_muestra3', 'Ley cancha 3': 'ley_cancha3', 'LEY CANCHA castigada': 'ley_cancha_castigada', 'LEY inicial': 'ley_inicial', 'Rango': 'rango', 'Ag*TMH': 'tmh_ag', 'Fe*TMH': 'tmh_fe', 'Mn*TMH': 'tmh_mn', 'Pb*TMH': 'tmh_pb', 'Zn*TMH': 'tmh_zn', 'Codigo tableta': 'cod_tableta', 'Labor Rep.': 'labor', 'FECHA ABASTECIMIENTO': 'date_abas', 'Columna1': 'columna'}, inplace=True)
+    df_reportes.rename(columns={'MES': 'month', 'FECHA EXTRACCION': 'date', 'Año': 'year', 'ESTADO': 'status', 'UBICACIÓN': 'ubication', 'TURNO': 'turn', 'ZONA': 'mining', 'EMPRESA': 'company', 'NIVEL': 'level', 'TIPO': 'type', 'Veta': 'veta', 'Tajo': 'tajo', 'Dominio': 'dominio', 't': 'ton', 'TMH': 'tonh', 'N° carros': 'vagones', 'Ley Stope': 'ley_stope', 'CODIGO MUESTRA': 'cod_muestra', 'LEY SO': 'ley_so', 'LEY CANCHA Ag': 'ley_ag', 'LEY CANCHA Fe': 'ley_fe', 'LEY CANCHA Mn': 'ley_mn', 'LEY CANCHA Pb': 'ley_pb', 'LEY CANCHA Zn': 'ley_zn', 'Ley Original': 'ley_original', 'Ley cancha 2': 'ley_cancha2', 'Codigo Muestra 3': 'cod_muestra3', 'Ley cancha 3': 'ley_cancha3', 'LEY CANCHA castigada': 'ley_cancha_castigada', 'LEY inicial': 'ley_inicial', 'Rango': 'rango', 'Ag*TMH': 'tmh_ag', 'Fe*TMH': 'tmh_fe', 'Mn*TMH': 'tmh_mn', 'Pb*TMH': 'tmh_pb', 'Zn*TMH': 'tmh_zn', 'Codigo tableta': 'cod_tableta', 'Labor Rep.': 'labor', 'FECHA ABASTECIMIENTO': 'date_abas', 'Columna1': 'columna'}, inplace=True)
 
     df_reportes['mining'] = df_reportes['mining'].replace('Yumpag', 'YUMPAG')
 
@@ -24,7 +27,6 @@ def getGeology():
     # convertir a int el level
     df_reportes['level'] = df_reportes['level'].astype(int)
 
-    #
     df_reportes['year'] = df_reportes['year'].astype(str)
 
     df_reportes['ton'].fillna(0, inplace=True)
@@ -57,10 +59,10 @@ def getGeology():
     df_reportes['date_abas'].fillna('--', inplace=True)
     df_reportes['columna'].fillna('--', inplace=True)
 
-    # df_reportes.groupby(['date_extraction','mining', 'month', 'year']).agg({'ton': 'sum', 'tonh': 'sum','ley_ag': 'mean', 'ley_fe': 'mean', 'ley_mn': 'mean', 'ley_pb': 'mean', 'ley_zn': 'mean'})
+    # df_reportes.groupby(['date','mining', 'month', 'year']).agg({'ton': 'sum', 'tonh': 'sum','ley_ag': 'mean', 'ley_fe': 'mean', 'ley_mn': 'mean', 'ley_pb': 'mean', 'ley_zn': 'mean'})
 
-    df_reportes['date_extraction'] = pd.to_datetime(df_reportes['date_extraction']).dt.strftime('%d/%m/%Y')
-    df_reportes['timestamp'] = df_reportes['date_extraction'].apply(lambda x: datetime.strptime(x, '%d/%m/%Y').timestamp())
+    df_reportes['date'] = pd.to_datetime(df_reportes['date']).dt.strftime('%d/%m/%Y')
+    df_reportes['timestamp'] = df_reportes['date'].apply(lambda x: datetime.strptime(x, '%d/%m/%Y').timestamp())
     df_reportes['month'] = df_reportes['month'].replace('0CTUBRE', 'OCTUBRE')
 
     df_reportes['veta'] = df_reportes['veta'].replace('VANESA', 'Vanessa')
@@ -108,19 +110,24 @@ def getGeology():
     df_reportes['tajo'] = df_reportes['tajo'].replace('Tj6488', 'TJ 6488')
     df_reportes['tajo'] = df_reportes['tajo'].replace('Tj 6618', 'TJ 6618')
 
-    df_reportes['week'] = pd.to_datetime(df_reportes['date_extraction'], format='%d/%m/%Y').dt.isocalendar().week
+    df_reportes['week'] = pd.to_datetime(df_reportes['date'], format='%d/%m/%Y').dt.isocalendar().week
     df_reportes['nro_month'] = df_reportes['month'].replace({'ENERO': 1, 'FEBRERO': 2, 'MARZO': 3, 'ABRIL': 4, 'MAYO': 5, 'JUNIO': 6, 'JULIO': 7, 'AGOSTO': 8, 'SEPTIEMBRE': 9, 'OCTUBRE': 10, 'NOVIEMBRE': 11, 'DICIEMBRE': 12})
 
+    df_reportes['tonh_ley_ag'] = df_reportes['tonh'] * df_reportes['ley_ag']
+    df_reportes['tonh_ley_fe'] = df_reportes['tonh'] * df_reportes['ley_fe']
+    df_reportes['tonh_ley_mn'] = df_reportes['tonh'] * df_reportes['ley_mn']
+    df_reportes['tonh_ley_pb'] = df_reportes['tonh'] * df_reportes['ley_pb']
+    df_reportes['tonh_ley_zn'] = df_reportes['tonh'] * df_reportes['ley_zn']
     df_main = df_reportes.copy()
-    df_main.drop(['columna', 'company', 'cod_muestra', 'vagones', 'cod_muestra3', 'ley_cancha_castigada', 'ley_stope', 'ley_inicial', 'tmh_ag', 'tmh_fe', 'tmh_mn', 'tmh_pb', 'tmh_zn', 'labor', 'ley_original', 'ley_cancha2', 'ley_cancha3', 'cod_tableta', 'date_abas'], axis=1, inplace=True)
+    df_main.drop(['columna', 'company', 'cod_muestra', 'vagones', 'cod_muestra3', 'ley_cancha_castigada', 'ley_stope', 'ley_inicial', 'tmh_ag', 'tmh_fe', 'tmh_mn', 'tmh_pb', 'tmh_zn', 'labor', 'ley_original', 'ley_cancha2', 'ley_cancha3', 'date_abas'], axis=1, inplace=True)
 
     df = df_reportes.copy()
     
-    # df = df.groupby([df['mining'], df['year'],df['month'], df['date_extraction']]).agg({'ton': 'sum', 'tonh': 'sum','ley_ag': 'mean', 'ley_fe': 'mean', 'ley_mn': 'mean', 'ley_pb': 'mean', 'ley_zn': 'mean'}).reset_index()
+    # df = df.groupby([df['mining'], df['year'],df['month'], df['date']]).agg({'ton': 'sum', 'tonh': 'sum','ley_ag': 'mean', 'ley_fe': 'mean', 'ley_mn': 'mean', 'ley_pb': 'mean', 'ley_zn': 'mean'}).reset_index()
 
     # mina = 'YUMPAG'
     # mes = 'ENERO'
 
     # df = df[(df['mining'] == mina) & (df['month'] == mes)]
     
-    return df, df_main
+    return df, df_main, df_prog

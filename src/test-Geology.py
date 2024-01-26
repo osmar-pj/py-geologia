@@ -18,10 +18,10 @@ pd.set_option('display.max_columns', None)
 
 df_reportes = pd.read_csv('../data/reportes.csv')
 df_prog = pd.read_csv('../data/prog.csv')
-df_prog['date_extraction'] = pd.to_datetime(df_prog['date'])
+df_prog['date'] = pd.to_datetime(df_prog['date'])
 df_prog['year'] = df_prog['year'].astype(str)
 
-df_reportes.rename(columns={'MES': 'month', 'FECHA EXTRACCION': 'date_extraction', 'Año': 'year', 'ESTADO': 'status', 'UBICACIÓN': 'ubication', 'TURNO': 'turn', 'ZONA': 'mining', 'EMPRESA': 'company', 'NIVEL': 'level', 'TIPO': 'type', 'Veta': 'veta', 'Tajo': 'tajo', 'Dominio': 'dominio', 't': 'ton', 'TMH': 'tonh', 'N° carros': 'vagones', 'Ley Stope': 'ley_stope', 'CODIGO MUESTRA': 'cod_muestra', 'LEY SO': 'ley_so', 'LEY CANCHA Ag': 'ley_ag', 'LEY CANCHA Fe': 'ley_fe', 'LEY CANCHA Mn': 'ley_mn', 'LEY CANCHA Pb': 'ley_pb', 'LEY CANCHA Zn': 'ley_zn', 'Ley Original': 'ley_original', 'Ley cancha 2': 'ley_cancha2', 'Codigo Muestra 3': 'cod_muestra3', 'Ley cancha 3': 'ley_cancha3', 'LEY CANCHA castigada': 'ley_cancha_castigada', 'LEY inicial': 'ley_inicial', 'Rango': 'rango', 'Ag*TMH': 'tmh_ag', 'Fe*TMH': 'tmh_fe', 'Mn*TMH': 'tmh_mn', 'Pb*TMH': 'tmh_pb', 'Zn*TMH': 'tmh_zn', 'Codigo tableta': 'cod_tableta', 'Labor Rep.': 'labor', 'FECHA ABASTECIMIENTO': 'date_abas', 'Columna1': 'columna'}, inplace=True)
+df_reportes.rename(columns={'MES': 'month', 'FECHA EXTRACCION': 'date', 'Año': 'year', 'ESTADO': 'status', 'UBICACIÓN': 'ubication', 'TURNO': 'turn', 'ZONA': 'mining', 'EMPRESA': 'company', 'NIVEL': 'level', 'TIPO': 'type', 'Veta': 'veta', 'Tajo': 'tajo', 'Dominio': 'dominio', 't': 'ton', 'TMH': 'tonh', 'N° carros': 'vagones', 'Ley Stope': 'ley_stope', 'CODIGO MUESTRA': 'cod_muestra', 'LEY SO': 'ley_so', 'LEY CANCHA Ag': 'ley_ag', 'LEY CANCHA Fe': 'ley_fe', 'LEY CANCHA Mn': 'ley_mn', 'LEY CANCHA Pb': 'ley_pb', 'LEY CANCHA Zn': 'ley_zn', 'Ley Original': 'ley_original', 'Ley cancha 2': 'ley_cancha2', 'Codigo Muestra 3': 'cod_muestra3', 'Ley cancha 3': 'ley_cancha3', 'LEY CANCHA castigada': 'ley_cancha_castigada', 'LEY inicial': 'ley_inicial', 'Rango': 'rango', 'Ag*TMH': 'tmh_ag', 'Fe*TMH': 'tmh_fe', 'Mn*TMH': 'tmh_mn', 'Pb*TMH': 'tmh_pb', 'Zn*TMH': 'tmh_zn', 'Codigo tableta': 'cod_tableta', 'Labor Rep.': 'labor', 'FECHA ABASTECIMIENTO': 'date_abas', 'Columna1': 'columna'}, inplace=True)
 
 df_reportes['mining'] = df_reportes['mining'].replace('Yumpag', 'YUMPAG')
 
@@ -66,8 +66,8 @@ df_reportes['columna'].fillna('--', inplace=True)
 
 # df_reportes.groupby(['date_extraction','mining', 'month', 'year']).agg({'ton': 'sum', 'tonh': 'sum','ley_ag': 'mean', 'ley_fe': 'mean', 'ley_mn': 'mean', 'ley_pb': 'mean', 'ley_zn': 'mean'})
 
-df_reportes['date_extraction'] = pd.to_datetime(df_reportes['date_extraction']).dt.strftime('%d/%m/%Y')
-df_reportes['timestamp'] = df_reportes['date_extraction'].apply(lambda x: datetime.strptime(x, '%d/%m/%Y').timestamp())
+df_reportes['date'] = pd.to_datetime(df_reportes['date']).dt.strftime('%d/%m/%Y')
+df_reportes['timestamp'] = df_reportes['date'].apply(lambda x: datetime.strptime(x, '%d/%m/%Y').timestamp())
 
 df_reportes['month'] = df_reportes['month'].replace('0CTUBRE', 'OCTUBRE')
 
@@ -116,13 +116,13 @@ df_reportes['tajo'] = df_reportes['tajo'].replace('TJ6790', 'TJ 6790')
 df_reportes['tajo'] = df_reportes['tajo'].replace('Tj6488', 'TJ 6488')
 df_reportes['tajo'] = df_reportes['tajo'].replace('Tj 6618', 'TJ 6618')
 
-df_reportes['week'] = pd.to_datetime(df_reportes['date_extraction'], format='%d/%m/%Y').dt.isocalendar().week
+df_reportes['week'] = pd.to_datetime(df_reportes['date'], format='%d/%m/%Y').dt.isocalendar().week
 df_reportes['nro_month'] = df_reportes['month'].replace({'ENERO': 1, 'FEBRERO': 2, 'MARZO': 3, 'ABRIL': 4, 'MAYO': 5, 'JUNIO': 6, 'JULIO': 7, 'AGOSTO': 8, 'SEPTIEMBRE': 9, 'OCTUBRE': 10, 'NOVIEMBRE': 11, 'DICIEMBRE': 12})
 #concatenar el nro de mes con el año
 df_reportes['nro_month'] = df_reportes['nro_month'].astype(str)
 
 df_main = df_reportes.copy()
-df_main.drop(['columna', 'company', 'cod_muestra', 'vagones', 'cod_muestra3', 'ley_cancha_castigada', 'ley_stope', 'ley_inicial', 'tmh_ag', 'tmh_fe', 'tmh_mn', 'tmh_pb', 'tmh_zn', 'labor', 'ley_original', 'ley_cancha2', 'ley_cancha3', 'cod_tableta'], axis=1, inplace=True)
+df_main.drop(['columna', 'company', 'cod_muestra', 'vagones', 'cod_muestra3', 'ley_cancha_castigada', 'ley_stope', 'ley_inicial', 'labor', 'ley_original', 'ley_cancha2', 'ley_cancha3'], axis=1, inplace=True)
 
 # BY MINA
 
@@ -190,11 +190,17 @@ columns.rename(columns={'index': 'name'}, inplace=True)
 columns['type'] = columns['type'].astype(str)
 columns = columns.to_dict('records')
 
-array = ['year', 'month', 'mining', 'date_extraction']
-df = df_reportes.groupby(array).agg(ton=('ton', 'sum'), tonh=('tonh', 'sum'), ley_ag=('ley_ag', 'mean'), ley_fe=('ley_fe', 'mean'), ley_mn=('ley_mn', 'mean'), ley_pb=('ley_pb', 'mean'), ley_zn=('ley_zn', 'mean')).reset_index()
+
+array = ['mining', 'year', 'date']
+word = 'month'
+idx = [i for i, s in enumerate(array) if word in s]
+nro_month = 'nro_month'
+if len(idx) != 0:
+    array.insert(idx[0], nro_month)
+df = df_reportes.groupby(array).agg(ton=('ton', 'sum'), tonh=('tonh', 'sum'), ley_ag=('ley_ag', 'mean'), ley_fe=('ley_fe', 'mean'), ley_mn=('ley_mn', 'mean'), ley_pb=('ley_pb', 'mean'), ley_zn=('ley_zn', 'mean'), tmh_ag=('tmh_ag', 'sum'), tmh_fe=('tmh_fe', 'sum'), tmh_mn=('tmh_mn', 'sum'), tmh_pb=('tmh_pb', 'sum'), tmh_zn=('tmh_zn', 'sum')).reset_index()
 
 #to dict
-df = df.to_dict('records')
+# df = df.to_dict('records')
 # 1698814800
 ts = '1704085200'
 mining = 'YUMPAG'
@@ -204,36 +210,61 @@ idxMonth = datetime.fromtimestamp(int(ts)).month - 1
 month = months[idxMonth]
 year = datetime.fromtimestamp(int(ts)).strftime('%Y')
 
-df_main['tonh*ley_ag'] = df_main['tonh'] * df_main['ley_ag']
-df_main['tonh*ley_fe'] = df_main['tonh'] * df_main['ley_fe']
-df_main['tonh*ley_mn'] = df_main['tonh'] * df_main['ley_mn']
-df_main['tonh*ley_pb'] = df_main['tonh'] * df_main['ley_pb']
-df_main['tonh*ley_zn'] = df_main['tonh'] * df_main['ley_zn']
-df1 = df_main.query('month == @month and year == @year and mining == @mining').groupby(['date_extraction']).agg({'tonh': 'sum', 'tonh*ley_ag': 'sum', 'tonh*ley_fe': 'sum', 'tonh*ley_mn': 'sum', 'tonh*ley_pb': 'sum', 'tonh*ley_zn': 'sum' }).reset_index()
-df1['Ag'] = df1['tonh*ley_ag'] / df1['tonh']
-df1['Fe'] = df1['tonh*ley_fe'] / df1['tonh']
-df1['Mn'] = df1['tonh*ley_mn'] / df1['tonh']
-df1['Pb'] = df1['tonh*ley_pb'] / df1['tonh']
-df1['Zn'] = df1['tonh*ley_zn'] / df1['tonh']
-# date_extraction to datetime firstday
-df1['date_extraction'] = pd.to_datetime(df1['date_extraction'], format='%d/%m/%Y')
-# df1['timestamp'] = df1['date_extraction'].apply(lambda x: datetime.strptime(x.strftime('%d/%m/%Y'), '%d/%m/%Y').timestamp())
-# # sort by timestamp
-# df1.sort_values(by=['timestamp'], inplace=True)
-
+df_main['tonh_ley_ag'] = df_main['tonh'] * df_main['ley_ag']
+df_main['tonh_ley_fe'] = df_main['tonh'] * df_main['ley_fe']
+df_main['tonh_ley_mn'] = df_main['tonh'] * df_main['ley_mn']
+df_main['tonh_ley_pb'] = df_main['tonh'] * df_main['ley_pb']
+df_main['tonh_ley_zn'] = df_main['tonh'] * df_main['ley_zn']
+df1 = df_main.query('month == @month and year == @year and mining == @mining').groupby(['date']).agg({'tonh': 'sum', 'tonh_ley_ag': 'sum', 'tonh_ley_fe': 'sum', 'tonh_ley_mn': 'sum', 'tonh_ley_pb': 'sum', 'tonh_ley_zn': 'sum' }).reset_index()
+df1['Ag'] = df1['tonh_ley_ag'] / df1['tonh']
+df1['Fe'] = df1['tonh_ley_fe'] / df1['tonh']
+df1['Mn'] = df1['tonh_ley_mn'] / df1['tonh']
+df1['Pb'] = df1['tonh_ley_pb'] / df1['tonh']
+df1['Zn'] = df1['tonh_ley_zn'] / df1['tonh']
+# date to datetime firstday
+df1['date'] = pd.to_datetime(df1['date'], format='%d/%m/%Y')
 df2 = df_prog.query('mining == @mining and month == @month and year == @year')
+if len(df2) == 0:
+    df3 = df1.copy()
+    df3['timestamp'] = df3['date'].apply(lambda x: datetime.strptime(x.strftime('%d/%m/%Y'), '%d/%m/%Y').timestamp())
+    df3['ton_prog'] = 0
+    df3['ley_prog'] = 0
+    df3.sort_values(by=['timestamp'], inplace=True)
+else:
+    df3 = pd.merge(df2, df1, on='date', how='left')
+    df3['timestamp'] = df3['date'].apply(lambda x: datetime.strptime(x.strftime('%d/%m/%Y'), '%d/%m/%Y').timestamp())
+    df3.sort_values(by=['timestamp'], inplace=True)
+    df3.replace(np.nan, None, inplace=True)
 
-# merge df2 and df1
-df3 = pd.merge(df2, df1, on='date_extraction', how='left')
-df3['timestamp'] = df3['date_extraction'].apply(lambda x: datetime.strptime(x.strftime('%d/%m/%Y'), '%d/%m/%Y').timestamp())
-# # sort by timestamp
-df3.sort_values(by=['timestamp'], inplace=True)
-df3.fillna(0, inplace=True)
+total_ton_prog = df3['ton_prog'].sum()
+total_ton = df3['tonh'].sum()
+aver_ley_prog = (df3['ton_prog'] * df3['ley_prog']).sum() / df3['ton_prog'].sum()
+aver_ley = (df3['tonh'] * df3['Ag']).sum() / df3['tonh'].sum()
+
+meta = {
+        'total_ton_prog': total_ton_prog,
+        'total_ton': total_ton,
+        'aver_ley_prog': aver_ley_prog,
+        'aver_ley': aver_ley
+    }
+
+df_cancha= df_reportes.query('status != "Planta"')
+df_cancha.reset_index(inplace=True)
+df_ruma = df_cancha.groupby(['ubication', 'mining', 'dominio', 'cod_tableta']).agg({'tonh': 'sum', 'tmh_ag': 'sum', 'tajo': ['unique']}).reset_index()
+df_ruma.columns = ['ubication', 'mining', 'dominio', 'cod_tableta', 'tonh', 'tmh_ag', 'tajo']
+df_ruma['ley_ag'] = df_ruma['tmh_ag'] / df_ruma['tonh']
+ruma = df_ruma.to_dict('records')
+# ruma2 = df_ruma.to_json(orient='records')
+# df_ruma.to_json('ruma.json', orient='records')
+# df_reportes.to_json('trip.json', orient='records')
+# sort df_main
+# df_main.sort_values(by=['timestamp'], inplace=True)
+# df_main.to_json('main.json', orient='records')
 
 # 1693544400 SEPTIEMBRE 2023
 # 1696136400 OCTUBRE 2023 (OK)
 # 1698814800 NOVIEMBRE 2023 (OK)
 # 1701406800 DICIEMBRE 2023
 # 1704085200 ENERO 2024
-
 # 1698814800 NOVIEMBRE 2023
+
