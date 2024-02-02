@@ -533,18 +533,18 @@ def geo_analysis2():
     df_main['tonh_ley_mn'] = df_main['tonh'] * df_main['ley_mn']
     df_main['tonh_ley_pb'] = df_main['tonh'] * df_main['ley_pb']
     df_main['tonh_ley_zn'] = df_main['tonh'] * df_main['ley_zn']
-    df1 = df_main.query('month == @month and year == @year and mining == @mining').groupby(['date_extraction']).agg({'tonh': 'sum', 'tonh_ley_ag': 'sum', 'tonh_ley_fe': 'sum', 'tonh_ley_mn': 'sum', 'tonh_ley_pb': 'sum', 'tonh_ley_zn': 'sum' }).reset_index()
+    df1 = df_main.query('month == @month and year == @year and mining == @mining').groupby(['date']).agg({'tonh': 'sum', 'tonh_ley_ag': 'sum', 'tonh_ley_fe': 'sum', 'tonh_ley_mn': 'sum', 'tonh_ley_pb': 'sum', 'tonh_ley_zn': 'sum' }).reset_index()
     df1['Ag'] = df1['tonh_ley_ag'] / df1['tonh']
     df1['Fe'] = df1['tonh_ley_fe'] / df1['tonh']
     df1['Mn'] = df1['tonh_ley_mn'] / df1['tonh']
     df1['Pb'] = df1['tonh_ley_pb'] / df1['tonh']
     df1['Zn'] = df1['tonh_ley_zn'] / df1['tonh']
     # date_extraction to datetime firstday
-    df1['date_extraction'] = pd.to_datetime(df1['date_extraction'], format='%d/%m/%Y')
+    df1['date'] = pd.to_datetime(df1['date'], format='%d/%m/%Y')
     df2 = df_prog.query('mining == @mining and month == @month and year == @year')
     if len(df2) == 0:
         df3 = df1.copy()
-        df3['timestamp'] = df3['date_extraction'].apply(lambda x: datetime.strptime(x.strftime('%d/%m/%Y'), '%d/%m/%Y').timestamp())
+        df3['timestamp'] = df3['date'].apply(lambda x: datetime.strptime(x.strftime('%d/%m/%Y'), '%d/%m/%Y').timestamp())
         df3['ton_prog'] = 0
         df3['ley_prog'] = 0
         df3.sort_values(by=['timestamp'], inplace=True)
@@ -572,14 +572,14 @@ def geo_analysis2():
 
 @app.route('/list_geology', methods=['GET'])
 def list_geology():
-    df_geology, df_main, df_prog = getGeology()
-    trips = db['listtrips']
-    df_trips = pd.DataFrame(list(trips.find()))
+    # df_geology, df_main, df_prog = getGeology()
+    listtrips = db['listtrips']
+    df_trips = pd.DataFrame(list(listtrips.find()))
     df_trips['_id'] = df_trips['_id']
-    df_main = df_trips.query('status != "Planta"')
-    df_main.sort_values(by=['timestamp'], ascending=False, inplace=True)
-    main = df_main.to_dict('records')
-    return jsonify(main)
+    # df_main = df_trips.query('status != "Planta"')
+    df_trips.sort_values(by=['timestamp'], ascending=False, inplace=True)
+    trips = df_trips.to_dict('records')
+    return jsonify(trips)
     
 
 @app.route('/ruma', methods=['GET'])
