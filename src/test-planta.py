@@ -31,4 +31,4 @@ df_reportes = pd.read_csv('reportes.csv')
 df_planta = df_reportes.query('status == "Planta"')
 df_planta['date'] = pd.to_datetime(df_planta['date'])
 
-df.to_json('planta.json', orient='records')
+# df.to_json('planta.json', orient='records')
