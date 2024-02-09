@@ -510,6 +510,7 @@ def geo_analysis():
 @app.route('/analysis2', methods=['GET'])
 def geo_analysis2():
     ts = request.args.get('ts')
+    mining = request.args.get('mining')
     # df_geology, df_main, df_prog = getGeology()
     trips = db['trips']
     df_trips = pd.DataFrame(list(trips.find()))
@@ -526,14 +527,14 @@ def geo_analysis2():
     df_main['tonh_ley_mn'] = df_main['tonh'] * df_main['ley_mn']
     df_main['tonh_ley_pb'] = df_main['tonh'] * df_main['ley_pb']
     df_main['tonh_ley_zn'] = df_main['tonh'] * df_main['ley_zn']
-    df1 = df_main.query('month == @month and year == @year').groupby(['date']).agg({'tonh': 'sum', 'tonh_ley_ag': 'sum', 'tonh_ley_fe': 'sum', 'tonh_ley_mn': 'sum', 'tonh_ley_pb': 'sum', 'tonh_ley_zn': 'sum' }).reset_index()
+    df1 = df_main.query('month == @month and year == @year and mining == @mining').groupby(['date']).agg({'tonh': 'sum', 'tonh_ley_ag': 'sum', 'tonh_ley_fe': 'sum', 'tonh_ley_mn': 'sum', 'tonh_ley_pb': 'sum', 'tonh_ley_zn': 'sum' }).reset_index()
     df1['Ag'] = df1['tonh_ley_ag'] / df1['tonh']
     df1['Fe'] = df1['tonh_ley_fe'] / df1['tonh']
     df1['Mn'] = df1['tonh_ley_mn'] / df1['tonh']
     df1['Pb'] = df1['tonh_ley_pb'] / df1['tonh']
     df1['Zn'] = df1['tonh_ley_zn'] / df1['tonh']
     df1['date'] = pd.to_datetime(df1['date'], format='%d/%m/%Y')
-    df2 = df_prog.query('month == @month and year == @year')
+    df2 = df_prog.query('month == @month and year == @year and mining == @mining')
     if len(df2) == 0:
         df3 = df1.copy()
         df3['timestamp'] = df3['date'].apply(lambda x: x.timestamp())  
@@ -556,6 +557,7 @@ def geo_analysis2():
         'aver_ley_prog': aver_ley_prog,
         'aver_ley': aver_ley
     }
+    
     result = df3.to_dict('records')
     return jsonify({
         'meta': meta,
