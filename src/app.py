@@ -493,20 +493,28 @@ def dataGeology():
 def geo_analysis():
     # Para la tabla dinamica
     data = request.get_json()
-    df_geology, df_main, df_prog = getGeology()
+    trips = db['trips']
+    df_trips = pd.DataFrame(list(trips.find()))
+    df_trips['_id'] = df_trips['_id'].astype(str)
     arr = data['arr']
-    if len(arr) == 0:
-        result = df_main.head(30).to_dict('records')
-    else:
+    print(arr)
+    months = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO','JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE','DICIEMBRE']
+    actualMonth = datetime.now().month
+    nameMonth = 'ENERO' #months[actualMonth - 1]
+    wordM = 'month'
+    areWordsIn = wordM in arr
+    if len(arr) > 0:
         month = 'month'
         idx = [i for i, s in enumerate(arr) if month in s]
         nro_month = 'nro_month'
         if len(idx) > 0:
             arr.insert(idx[0], nro_month)
-        df_result = df_geology.groupby(arr).agg(ton=('ton', 'sum'), tonh=('tonh', 'sum'), ley_ag=('ley_ag', 'mean'), ley_fe=('ley_fe', 'mean'), ley_mn=('ley_mn', 'mean'), ley_pb=('ley_pb', 'mean'), ley_zn=('ley_zn', 'mean'), tmh_ag=('tmh_ag', 'sum'), tmh_fe=('tmh_fe', 'sum'), tmh_mn=('tmh_mn', 'sum'), tmh_pb=('tmh_pb', 'sum'), tmh_zn=('tmh_zn', 'sum')).reset_index()
+        df_result = df_trips.groupby(arr).agg(ton=('ton', 'sum'), tonh=('tonh', 'sum'), ley_ag=('ley_ag', 'mean'), ley_fe=('ley_fe', 'mean'), ley_mn=('ley_mn', 'mean'), ley_pb=('ley_pb', 'mean'), ley_zn=('ley_zn', 'mean'), tmh_ag=('tmh_ag', 'sum'), tmh_fe=('tmh_fe', 'sum'), tmh_mn=('tmh_mn', 'sum'), tmh_pb=('tmh_pb', 'sum'), tmh_zn=('tmh_zn', 'sum')).reset_index()
+        if areWordsIn:
+            df_result = df_result.query('month == @nameMonth')
         result = df_result.to_dict('records')
-
     return jsonify(result)
+
 @app.route('/analysis2', methods=['GET'])
 def geo_analysis2():
     ts = request.args.get('ts')
