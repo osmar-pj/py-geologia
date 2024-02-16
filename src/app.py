@@ -32,6 +32,27 @@ client = MongoClient(os.getenv('MONGO_URI'))
 
 db = client['wapsi']
 
+def moda_data(data):
+    if len(data) == 0:
+        return ""
+    
+    data_count = {}
+    max_count = 0
+    moda = 0
+    
+    for i in data:
+        if i in data_count:
+            data_count[i] += 1
+        else:
+            data_count[i] = 1
+            
+    for key, value in data_count.items():
+        if value > max_count:
+            moda = key
+            max_count = value
+            
+    return moda
+
 @app.route('/truck', methods=['GET'])
 def getDataTruck():
 
@@ -493,26 +514,18 @@ def dataGeology():
 def geo_analysis():
     # Para la tabla dinamica
     data = request.get_json()
-    trips = db['trips']
-    df_trips = pd.DataFrame(list(trips.find()))
-    df_trips['_id'] = df_trips['_id'].astype(str)
     arr = data['arr']
-    print(arr)
-    months = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO','JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE','DICIEMBRE']
-    actualMonth = datetime.now().month
-    nameMonth = 'ENERO' #months[actualMonth - 1]
-    wordM = 'month'
-    areWordsIn = wordM in arr
-    if len(arr) > 0:
-        month = 'month'
-        idx = [i for i, s in enumerate(arr) if month in s]
-        nro_month = 'nro_month'
-        if len(idx) > 0:
-            arr.insert(idx[0], nro_month)
-        df_result = df_trips.groupby(arr).agg(ton=('ton', 'sum'), tonh=('tonh', 'sum'), ley_ag=('ley_ag', 'mean'), ley_fe=('ley_fe', 'mean'), ley_mn=('ley_mn', 'mean'), ley_pb=('ley_pb', 'mean'), ley_zn=('ley_zn', 'mean'), tmh_ag=('tmh_ag', 'sum'), tmh_fe=('tmh_fe', 'sum'), tmh_mn=('tmh_mn', 'sum'), tmh_pb=('tmh_pb', 'sum'), tmh_zn=('tmh_zn', 'sum')).reset_index()
-        if areWordsIn:
-            df_result = df_result.query('month == @nameMonth')
-        result = df_result.to_dict('records')
+    data = data['trips']
+    df = pd.DataFrame(data)
+    df['dominio'] = df['dominio'].apply(lambda x: moda_data(x))
+    df['tajo'] = df['tajo'].apply(lambda x: moda_data(x))
+    df['zona'] = df['zona'].apply(lambda x: moda_data(x))
+    df['veta'] = df['veta'].apply(lambda x: moda_data(x))
+    def leyPonderada(x):
+        return np.average(x, weights=df.loc[x.index, 'tonh'])
+
+    _df = df.groupby(arr).agg({'tonh': 'sum', 'ley_ag': leyPonderada, 'ley_fe': leyPonderada, 'ley_mn': leyPonderada, 'ley_pb': leyPonderada, 'ley_zn': leyPonderada}).reset_index()
+    result = _df.to_dict('records') 
     return jsonify(result)
 
 @app.route('/analysis2', methods=['GET'])
