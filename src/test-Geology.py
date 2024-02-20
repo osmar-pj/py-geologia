@@ -16,6 +16,28 @@ db = client['wapsi']
 pd.set_option('display.max_columns', None)
 # pd.set_option('display.max_rows', None)
 
+def moda_data(data):
+    isArray = isinstance(data, list)
+    if isArray:
+        return data
+    
+    data_count = {}
+    max_count = 0
+    moda = 0
+    
+    for i in data:
+        if i in data_count:
+            data_count[i] += 1
+        else:
+            data_count[i] = 1
+            
+    for key, value in data_count.items():
+        if value > max_count:
+            moda = key
+            max_count = value
+            
+    return moda
+
 df_reportes = pd.read_csv('../data/reportes.csv')
 df_prog = pd.read_csv('../data/prog.csv')
 df_prog['date'] = pd.to_datetime(df_prog['date'])
@@ -24,19 +46,36 @@ df_prog['year'] = df_prog['year']
 trips = db['trips']
 df_trips = pd.DataFrame(list(trips.find()))
 df_trips['_id'] = df_trips['_id'].astype(str)
-arr = ['year', 'month', 'rango', 'tajo']
-months = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO','JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE','DICIEMBRE']
-actualMonth = datetime.now().month
-nameMonth = 'ENERO' #months[actualMonth - 1]
-wordM = 'month'
-areWordsIn = wordM in arr
-if len(arr) > 0:
-    month = 'month'
-    idx = [i for i, s in enumerate(arr) if month in s]
-    nro_month = 'nro_month'
-    if len(idx) > 0:
-        arr.insert(idx[0], nro_month)
-    df_result = df_trips.groupby(arr).agg(ton=('ton', 'sum'), tonh=('tonh', 'sum'), ley_ag=('ley_ag', 'mean'), ley_fe=('ley_fe', 'mean'), ley_mn=('ley_mn', 'mean'), ley_pb=('ley_pb', 'mean'), ley_zn=('ley_zn', 'mean'), tmh_ag=('tmh_ag', 'sum'), tmh_fe=('tmh_fe', 'sum'), tmh_mn=('tmh_mn', 'sum'), tmh_pb=('tmh_pb', 'sum'), tmh_zn=('tmh_zn', 'sum')).reset_index()
-    if areWordsIn:
-        df_result = df_result.query('month == @nameMonth')
-    # result = df_result.to_dict('records')
+df = df_trips
+
+ts = 1708398742
+category = "trips"
+arr = ["rango", "type"]
+
+fixed = ["year", "month", "mining"]
+months = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"]
+month = months[datetime.fromtimestamp(ts).month - 1]
+year = datetime.fromtimestamp(ts).year
+if category == "planta":
+    df['dominio'] = df['dominio'].apply(lambda x: moda_data(x))
+    df['tajo'] = df['tajo'].apply(lambda x: moda_data(x))
+    df['zona'] = df['zona'].apply(lambda x: moda_data(x))
+#     df['veta'] = df['veta'].apply(lambda x: moda_data(x))
+def leyPonderada(x):
+    return np.average(x, weights=df.loc[x.index, 'tonh'])
+
+both = [
+    {"mining": "YUMPAG"},
+    {"mining": "UCHUCCHACUA"}
+]
+# grouped is concat fixed and arr
+grouped = fixed + arr
+df_body = df.groupby(grouped).agg({'tonh': 'sum', 'ley_ag': leyPonderada, 'ley_fe': leyPonderada, 'ley_mn': leyPonderada, 'ley_pb': leyPonderada, 'ley_zn': leyPonderada}).reset_index()
+
+data = []
+for i in range(len(both)):
+    df_bodyFiltered = df_body[( df_body['year'] == year) & (df_body['month'] == month) & (df_body['mining'] == both[i]['mining'])]
+    df_footer = df_bodyFiltered.groupby("month").agg({'tonh': 'sum', 'ley_ag': leyPonderada, 'ley_fe': leyPonderada, 'ley_mn': leyPonderada, 'ley_pb': leyPonderada, 'ley_zn': leyPonderada}).reset_index()
+    body = df_bodyFiltered.to_dict('records')
+    footer = df_footer.to_dict('records')
+    data.append({"body": body, "footer": footer})

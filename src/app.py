@@ -33,8 +33,9 @@ client = MongoClient(os.getenv('MONGO_URI'))
 db = client['wapsi']
 
 def moda_data(data):
-    if len(data) == 0:
-        return ""
+    isArray = isinstance(data, list)
+    if isArray:
+        return data
     
     data_count = {}
     max_count = 0
@@ -505,7 +506,7 @@ def dataGeology():
         'veta': veta,
         'tajo': tajo,
         'dominio': dominio,
-        'columns': columns
+        'columns': columns # Aqui se envia la data de las columnas para el filtered
     }
     
     return jsonify(data)
@@ -514,25 +515,49 @@ def dataGeology():
 def geo_analysis():
     # Para la tabla dinamica
     data = request.get_json()
+    ts = data['ts']
+    category = data['category']
     arr = data['arr']
-    data = data['trips']
-    df = pd.DataFrame(data)
-    df['dominio'] = df['dominio'].apply(lambda x: moda_data(x))
-    df['tajo'] = df['tajo'].apply(lambda x: moda_data(x))
-    df['zona'] = df['zona'].apply(lambda x: moda_data(x))
-    df['veta'] = df['veta'].apply(lambda x: moda_data(x))
+    trips = data['trips']
+    df = pd.DataFrame(trips)
+    fixed = ["year", "month", "mining"]
+    date = datetime.fromtimestamp(int(ts)).strftime("%d/%m/%Y")
+    # timestamp = int(ts)
+    months = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"]
+    month = months[datetime.fromtimestamp(ts).month - 1]
+    year = datetime.fromtimestamp(ts).year
+    if category == "planta":
+        df['dominio'] = df['dominio'].apply(lambda x: moda_data(x))
+        df['tajo'] = df['tajo'].apply(lambda x: moda_data(x))
+        df['zona'] = df['zona'].apply(lambda x: moda_data(x))
+    #     df['veta'] = df['veta'].apply(lambda x: moda_data(x))
     def leyPonderada(x):
         return np.average(x, weights=df.loc[x.index, 'tonh'])
 
-    _df = df.groupby(arr).agg({'tonh': 'sum', 'ley_ag': leyPonderada, 'ley_fe': leyPonderada, 'ley_mn': leyPonderada, 'ley_pb': leyPonderada, 'ley_zn': leyPonderada}).reset_index()
-    result = _df.to_dict('records') 
-    return jsonify(result)
+    both = [
+        {"mining": "YUMPAG"},
+        {"mining": "UCHUCCHACUA"}
+    ]
+    # grouped is concat fixed and arr
+    grouped = fixed + arr
+    df_body = df.groupby(grouped).agg({'tonh': 'sum', 'ley_ag': leyPonderada, 'ley_fe': leyPonderada, 'ley_mn': leyPonderada, 'ley_pb': leyPonderada, 'ley_zn': leyPonderada}).reset_index()
 
-@app.route('/analysis2', methods=['GET'])
-def geo_analysis2():
+    data = []
+    for i in range(len(both)):
+        df_bodyFiltered = df_body[( df_body['year'] == year) & (df_body['month'] == month) & (df_body['mining'] == both[i]['mining'])]
+        df_footer = df_bodyFiltered.groupby("month").agg({'tonh': 'sum', 'ley_ag': leyPonderada, 'ley_fe': leyPonderada, 'ley_mn': leyPonderada, 'ley_pb': leyPonderada, 'ley_zn': leyPonderada}).reset_index()
+        body = df_bodyFiltered.to_dict('records')
+        footer = df_footer.to_dict('records')
+        data.append({"body": body, "footer": footer})
+
+    return jsonify({
+        "data": data
+    })
+
+@app.route('/analysisIn', methods=['GET'])
+def geo_analysisIn():
     ts = request.args.get('ts')
     mining = request.args.get('mining')
-    # df_geology, df_main, df_prog = getGeology()
     trips = db['trips']
     df_trips = pd.DataFrame(list(trips.find()))
     df_trips['_id'] = df_trips['_id'].astype(str)
@@ -583,6 +608,56 @@ def geo_analysis2():
     return jsonify({
         'meta': meta,
         'result': result
+    })
+
+@app.route('/analysisOut', methods=['GET'])
+def geo_analysisOut():
+    ts = request.args.get('ts')
+    months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+    idxMonth = datetime.fromtimestamp(int(ts)).month - 1
+    month = months[idxMonth]
+    year = datetime.fromtimestamp(int(ts)).year
+    print(month, year)
+
+    trips = db['plantas']
+    df_trips = pd.DataFrame(list(trips.find()))
+    df_trips['_id'] = df_trips['_id'].astype(str)
+
+    df_prog = pd.read_csv('./data/prog_planta.csv')
+    df_finos = pd.read_csv('./data/finos_planta.csv')
+    df_lab = pd.read_csv('./data/lab_planta.csv')
+
+    df_prog.fillna(np.nan, inplace=True)
+    df_finos.fillna(np.nan, inplace=True)
+    df_lab.fillna(np.nan, inplace=True)
+
+    df_prog.replace(np.nan, None, inplace=True)
+    df_finos.replace(np.nan, None, inplace=True)
+    df_lab.replace(np.nan, None, inplace=True)
+
+    df_prog['date'] = pd.to_datetime(df_prog['date'])
+    df_finos['date'] = pd.to_datetime(df_finos['date'])
+    df_lab['date'] = pd.to_datetime(df_lab['date'])
+
+    def leyPonderada(x):
+            return np.average(x, weights=df_trips.loc[x.index, 'tonh'])
+
+    df_planta = df_trips.groupby('date').agg({'ton': 'sum', 'tonh': 'sum', 'ley_ag': leyPonderada, 'ley_fe': leyPonderada, 'ley_mn': leyPonderada, 'ley_pb': leyPonderada, 'ley_zn': leyPonderada}).reset_index()
+
+    # # concat all dataframes
+    df_planta = df_planta.merge(df_prog, on='date', how='left')
+    df_planta = df_planta.merge(df_finos, on='date', how='left')
+    df_planta = df_planta.merge(df_lab, on='date', how='left')
+    df_planta['month'] = df_planta['date'].dt.month
+    df_planta['month'] = df_planta['month'].apply(lambda x: months[x-1])
+    df_planta['year'] = df_planta['date'].dt.year
+    df_planta['timestamp'] = df_planta['date'].apply(lambda x: x.timestamp())  
+
+    _df = df_planta[(df_planta['month'] == month) & (df_planta['year'] == year)]
+    result = _df.to_dict('records')
+    return jsonify({
+        'result': result,
+        "meta": []
     })
 
 @app.route('/list_geology', methods=['GET'])
