@@ -75,7 +75,11 @@ df_body = df.groupby(grouped).agg({'tonh': 'sum', 'ley_ag': leyPonderada, 'ley_f
 data = []
 for i in range(len(both)):
     df_bodyFiltered = df_body[( df_body['year'] == year) & (df_body['month'] == month) & (df_body['mining'] == both[i]['mining'])]
-    df_footer = df_bodyFiltered.groupby("month").agg({'tonh': 'sum', 'ley_ag': leyPonderada, 'ley_fe': leyPonderada, 'ley_mn': leyPonderada, 'ley_pb': leyPonderada, 'ley_zn': leyPonderada}).reset_index()
-    body = df_bodyFiltered.to_dict('records')
-    footer = df_footer.to_dict('records')
-    data.append({"body": body, "footer": footer})
+    df_footer = df_bodyFiltered.groupby("year").agg({'tonh': 'sum', 'ley_ag': leyPonderada, 'ley_fe': leyPonderada, 'ley_mn': leyPonderada, 'ley_pb': leyPonderada, 'ley_zn': leyPonderada}).reset_index()
+    # concat body and footer
+    df_footer['year'] = "TOTAL"
+    _df = pd.concat([df_bodyFiltered, df_footer])
+    _df.replace(np.nan, None, inplace=True)
+    print(_df, i)
+    body = _df.to_dict('records')
+    data.append({"body": body})
