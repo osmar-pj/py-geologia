@@ -43,19 +43,20 @@ def leyPonderada(x):
 
 df_main = df.query('status != "Planta"').reset_index(drop=True)
 df_planta = df.query('status == "Planta"').reset_index(drop=True)
-df_pila = df_main.groupby('cod_tableta').agg({'tajo': 'unique', 'type': 'unique', 'ubication': 'unique', 'dominio': 'unique', '_id': 'unique', 'status': 'unique',
+df_pila = df_main.groupby('cod_tableta').agg({'tajo': 'unique', 'type': 'unique', 'ubication': 'unique', 'dominio': 'unique', '_id': 'unique', 'status': 'unique', 'mining': 'unique',
         'ton': 'sum', 'tonh': 'sum', 'ley_ag': leyPonderada, 'ley_fe': leyPonderada,'ley_mn': leyPonderada, 'ley_pb': leyPonderada, 'ley_zn': leyPonderada}).reset_index()
-# rename columns
-df_planta_pila = df_planta.groupby('cod_tableta').agg({'tajo': 'unique', 'type': 'unique', 'ubication': 'unique', 'dominio': 'unique', '_id': 'unique', 'status': 'unique',
+df_planta_pila = df_planta.groupby('cod_tableta').agg({'tajo': 'unique', 'type': 'unique', 'ubication': 'unique', 'dominio': 'unique', '_id': 'unique', 'status': 'unique', 'mining': 'unique',
         'ton': 'sum', 'tonh': 'sum', 'ley_ag': leyPonderada, 'ley_fe': leyPonderada,'ley_mn': leyPonderada, 'ley_pb': leyPonderada, 'ley_zn': leyPonderada}).reset_index()
-df_pila.columns = ['cod_tableta', 'tajo', 'type', 'ubication', 'dominio', 'travels', 'status', 'ton', 'tonh', 'ley_ag', 'ley_fe', 'ley_mn', 'ley_pb', 'ley_zn']
-df_planta_pila.columns = ['cod_tableta', 'tajo', 'type', 'ubication', 'dominio', 'travels', 'status', 'ton', 'tonh', 'ley_ag', 'ley_fe', 'ley_mn', 'ley_pb', 'ley_zn']
+df_pila.columns = ['cod_tableta', 'tajo', 'type', 'ubication', 'dominio', 'travels', 'status', 'mining', 'ton', 'tonh', 'ley_ag', 'ley_fe', 'ley_mn', 'ley_pb', 'ley_zn']
+df_planta_pila.columns = ['cod_tableta', 'tajo', 'type', 'ubication', 'dominio', 'travels', 'status', 'mining', 'ton', 'tonh', 'ley_ag', 'ley_fe', 'ley_mn', 'ley_pb', 'ley_zn']
 df_pila['ubication'] = df_pila['ubication'].apply(lambda x: moda_data(x))
 df_planta_pila['ubication'] = df_planta_pila['ubication'].apply(lambda x: moda_data(x))
 df_pila['status'] = df_pila['status'].apply(lambda x: moda_data(x))
 df_planta_pila['status'] = df_planta_pila['status'].apply(lambda x: moda_data(x))
+df_pila['mining'] = df_pila['mining'].apply(lambda x: moda_data(x))
+df_planta_pila['mining'] = df_planta_pila['mining'].apply(lambda x: moda_data(x))
 
-df_pilas2 = pd.concat([df_pila, df_planta_pila], ignore_index=True)
+df_pilas2 = pd.concat([df_planta_pila, df_pila], ignore_index=True)
 
 df_pilas2.to_json('pilas2.json', orient='records')
 

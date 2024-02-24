@@ -34,7 +34,7 @@ db = client['wapsi']
 
 def moda_data(data):
     isArray = isinstance(data, list)
-    if isArray:
+    if not isArray:
         return data
     data_count = {}
     max_count = 0
@@ -52,7 +52,6 @@ def moda_data(data):
 
 @app.route('/truck', methods=['GET'])
 def getDataTruck():
-
     periodo = request.args.get('period')
     value = request.args.get('value')
     ruta = request.args.get('ruta')
@@ -558,29 +557,30 @@ def geo_analysis():
 def geo_analysisIn():
     ts = request.args.get('ts')
     mining = request.args.get('mining')
-    trips = db['trips']
-    df_trips = pd.DataFrame(list(trips.find()))
-    df_trips['_id'] = df_trips['_id'].astype(str)
-    df_main= df_trips.query('status != "Planta"')
-    df_prog = pd.read_csv('./data/prog.csv')
-    df_prog['date'] = pd.to_datetime(df_prog['date'])
+
     months = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO','JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE','DICIEMBRE']
     idxMonth = datetime.fromtimestamp(int(ts)).month - 1
     month = months[idxMonth]
+
+    trips = db['trips']
+    df_trips = pd.DataFrame(list(trips.find()))
+    df_trips['_id'] = df_trips['_id'].astype(str)
+    df_main= df_trips.query('status != "Planta" and (statusTrip == "waitDateAbastecimiento" or statusTrip == "waitBeginDespacho")')
+    df_prog = pd.read_csv('./data/prog_canchas.csv')
+    df_prog['date'] = pd.to_datetime(df_prog['date'])
+    df_prog['month'] = df_prog['date'].dt.month
+    df_prog['year'] = df_prog['date'].dt.year
+    df_prog['month'] = df_prog['month'].apply(lambda x: months[x-1])
+    df_prog['ton_prog'] = df_prog['ton_prog'].apply(lambda x: x.replace(',', '') if isinstance(x, str) else x)
+    df_prog['ton_prog'] = df_prog['ton_prog'].astype(float)
     year = datetime.fromtimestamp(int(ts)).year
-    df_main['tonh_ley_ag'] = df_main['tonh'] * df_main['ley_ag']
-    df_main['tonh_ley_fe'] = df_main['tonh'] * df_main['ley_fe']
-    df_main['tonh_ley_mn'] = df_main['tonh'] * df_main['ley_mn']
-    df_main['tonh_ley_pb'] = df_main['tonh'] * df_main['ley_pb']
-    df_main['tonh_ley_zn'] = df_main['tonh'] * df_main['ley_zn']
-    df1 = df_main.query('month == @month and year == @year and mining == @mining').groupby(['date']).agg({'tonh': 'sum', 'tonh_ley_ag': 'sum', 'tonh_ley_fe': 'sum', 'tonh_ley_mn': 'sum', 'tonh_ley_pb': 'sum', 'tonh_ley_zn': 'sum' }).reset_index()
-    df1['Ag'] = df1['tonh_ley_ag'] / df1['tonh']
-    df1['Fe'] = df1['tonh_ley_fe'] / df1['tonh']
-    df1['Mn'] = df1['tonh_ley_mn'] / df1['tonh']
-    df1['Pb'] = df1['tonh_ley_pb'] / df1['tonh']
-    df1['Zn'] = df1['tonh_ley_zn'] / df1['tonh']
+    def leyPonderada(x):
+            return np.average(x, weights=df_main.loc[x.index, 'tonh'])
+    df1 = df_main.query('month == @month and year == @year and mining == @mining').groupby(['date']).agg({'tonh': 'sum', 'ley_ag': leyPonderada, 'ley_fe': leyPonderada, 'ley_mn': leyPonderada, 'ley_pb': leyPonderada, 'ley_zn': leyPonderada}).reset_index()
+
     df1['date'] = pd.to_datetime(df1['date'], format='%d/%m/%Y')
     df2 = df_prog.query('month == @month and year == @year and mining == @mining')
+
     if len(df2) == 0:
         df3 = df1.copy()
         df3['timestamp'] = df3['date'].apply(lambda x: x.timestamp())  
@@ -592,16 +592,20 @@ def geo_analysisIn():
         df3['timestamp'] = df3['date'].apply(lambda x: datetime.strptime(x.strftime('%d/%m/%Y'), '%d/%m/%Y').timestamp())
         df3.sort_values(by=['timestamp'], inplace=True)
         df3.replace(np.nan, None, inplace=True)
+    now = datetime.now()
+    nowTimestamp = now.timestamp()
+    idxNonthNow = datetime.fromtimestamp(int(ts)).month - 1
+    monthNow = months[idxNonthNow]
+    yearNow = now.year
+
     total_ton_prog = df3['ton_prog'].sum()
-    total_ton = df3['tonh'].sum()
-    aver_ley_prog = (df3['ton_prog'] * df3['ley_prog']).sum() / df3['ton_prog'].sum()
-    aver_ley = (df3['tonh'] * df3['Ag']).sum() / df3['tonh'].sum()
+    total_ton_ejec_cumm = df3.query('timestamp < @nowTimestamp')['tonh'].sum()
+    total_ton_prog_cumm = df3.query('timestamp < @nowTimestamp')['ton_prog'].sum()
 
     meta = {
         'total_ton_prog': total_ton_prog,
-        'total_ton': total_ton,
-        'aver_ley_prog': aver_ley_prog,
-        'aver_ley': aver_ley
+        'total_ton_ejec_cumm': total_ton_ejec_cumm,
+        'total_ton_prog_cumm': total_ton_prog_cumm
     }
     
     result = df3.to_dict('records')
@@ -617,7 +621,6 @@ def geo_analysisOut():
     idxMonth = datetime.fromtimestamp(int(ts)).month - 1
     month = months[idxMonth]
     year = datetime.fromtimestamp(int(ts)).year
-    print(month, year)
 
     trips = db['plantas']
     df_trips = pd.DataFrame(list(trips.find()))
@@ -662,46 +665,62 @@ def geo_analysisOut():
 
 @app.route('/nsr', methods=['GET'])
 def nsr():
-    trips = db['trips']
-    df_trips = pd.DataFrame(list(trips.find()))
-    df_trips['_id'] = df_trips['_id'].astype(str)
-    df_main= df_trips.query('statusTrip == "waitBeginDespacho" or statusTrip == "Despachando"').reset_index(drop=True)
+    def moda_data(data):
+        isArray = isinstance(data, list)
+        if not isArray:
+            return data
+        data_count = {}
+        max_count = 0
+        moda = 0
+        for i in data:
+            if i in data_count:
+                data_count[i] += 1
+            else:
+                data_count[i] = 1
+        for key, value in data_count.items():
+            if value > max_count:
+                moda = key
+                max_count = value
+        return moda
 
-    def leyPonderada(x):
-            return np.average(x, weights=df_main.loc[x.index, 'tonh'])
-
-    df = df_main.groupby(['ubication', 'dominio']).agg({'tonh': 'sum', 'ley_ag': leyPonderada, 'ley_pb': leyPonderada, 'ley_zn': leyPonderada}).reset_index()
-    _df = df_main.groupby(['ubication']).agg({'tonh': 'sum', 'ley_ag': leyPonderada, 'ley_pb': leyPonderada, 'ley_zn': leyPonderada}).reset_index()
+    def nsr(df):
+            df['ag_rec'] = [0.28877 * x if x < 2.8 else 0.0422 * np.log(x) + 0.768505 for x in df['ley_ag']]
+            df['pb_rec'] = [2.2829 * x if x < 0.4 else 0.0024 * x + 0.896 for x in df['ley_pb']]
+            df['zn_rec'] = [0.81564 * x if x < 0.55 else 0.14627 * np.log(x) + 0.60619 if x < 7.85 else 0.808 for x in df['ley_zn']]
+            df['nsr'] = df['ag_rec'] * pointValues['vp_ag'] * df['ley_ag'] + df['pb_rec'] * pointValues['vp_pb'] * df['ley_pb'] + df['zn_rec'] * pointValues['vp_zn'] * df['ley_zn']
+            df['ag_eq'] = df['nsr'] / (pointValues['vp_ag'] * df['ag_rec'])
+            return df
 
     pointValues = {
-        'vp_ag': 13,
-        'vp_pb': 14.69,
-        'vp_zn': 13.76,
+            'vp_ag': 13,
+            'vp_pb': 14.69,
+            'vp_zn': 13.76,
     }
-    def nsr(df):
-        df['ag_rec'] = [0.28877 * x if x < 2.8 else 0.0422 * np.log(x) + 0.768505 for x in df['ley_ag']]
-        df['pb_rec'] = [2.2829 * x if x < 0.4 else 0.0024 * x + 0.896 for x in df['ley_pb']]
-        df['zn_rec'] = [0.81564 * x if x < 0.55 else 0.14627 * np.log(x) + 0.60619 if x < 7.85 else 0.808 for x in df['ley_zn']]
-        df['nsr'] = df['ag_rec'] * pointValues['vp_ag'] * df['ley_ag'] + df['pb_rec'] * pointValues['vp_pb'] * df['ley_pb'] + df['zn_rec'] * pointValues['vp_zn'] * df['ley_zn']
-        df['ag_eq'] = df['nsr'] / (pointValues['vp_ag'] * df['ag_rec'])
-        return df
+    pilas = db['pilas']
+    df_pilas = pd.DataFrame(list(pilas.find()))
+    df_pilas['_id'] = df_pilas['_id'].astype(str)
+    df_resumen = df_pilas.query('status == "Cancha" and (statusPila == "waitBeginDespacho" or statusPila == "Despachando")').reset_index(drop=True)
+    df_resumen['dominio'] = df_resumen['dominio'].apply(lambda x: moda_data(x))
 
-    df = nsr(df)
-    _df = nsr(_df)
-    df['index'] = df.index
-    _df['index'] = _df.index
+    def leyPonderada(x):
+            return np.average(x, weights=df_resumen.loc[x.index, 'tonh'])
+
+    df1 = df_resumen.groupby(['ubication', 'dominio']).agg({'tonh': 'sum', 'ley_ag': leyPonderada, 'ley_pb': leyPonderada, 'ley_zn': leyPonderada}).reset_index()
+    df2 = df_resumen.groupby(['ubication']).agg({'tonh': 'sum', 'ley_ag': leyPonderada, 'ley_pb': leyPonderada, 'ley_zn': leyPonderada}).reset_index()
+    df1 = nsr(df1)
+    df2 = nsr(df2)
+    df1['index'] = df1.index
+    df2['index'] = df2.index
     return jsonify({
-        "data": df.to_dict('records'),
-        "total": _df.to_dict('records')
+        "data": df1.to_dict('records'),
+        "total": df2.to_dict('records')
     })
 
 @app.route('/list_geology', methods=['GET'])
 def list_geology():
-    # df_geology, df_main, df_prog = getGeology()
     listtrips = db['listtrips']
     df_trips = pd.DataFrame(list(listtrips.find()))
     df_trips['_id'] = df_trips['_id']
-    # df_main = df_trips.query('status != "Planta"')
     df_trips.sort_values(by=['timestamp'], ascending=False, inplace=True)
     trips = df_trips.to_dict('records')
     return jsonify(trips)
@@ -709,16 +728,8 @@ def list_geology():
 
 @app.route('/ruma', methods=['GET'])
 def rumas():
-    # df_geology, df_main, df_prog = getGeology()
     rumas = db['rumas']
     df_ruma = pd.DataFrame(list(rumas.find()))
-    # trips = db['listtrips']
-    # df_trips = pd.DataFrame(list(trips.find()))
-    # df_trips['_id'] = df_trips['_id']
-    # df_cancha= df_trips.query('status != "Planta"')
-    # df_ruma = df_cancha.groupby(['ubication', 'mining', 'dominio', 'cod_tableta']).agg({'tonh': 'sum', 'tmh_ag': 'sum', 'tajo': ['unique']}).reset_index()
-    # df_ruma.columns = ['ubication', 'mining', 'dominio', 'cod_tableta', 'tonh', 'tmh_ag', 'tajo']
-    # df_ruma['ley_ag'] = df_ruma['tmh_ag'] / df_ruma['tonh']
     ruma = df_ruma.to_json(orient='records')
     return jsonify(ruma)
 
