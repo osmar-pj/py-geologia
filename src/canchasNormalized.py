@@ -76,9 +76,9 @@ df.drop(['LEY CANCHA Ag2', 'LEY CANCHA Fe3', 'LEY CANCHA Mn4', 'LEY CANCHA Pb5',
 
 df['carriage'] = 'Camion'
 # if vagones is different 0 then carriage is 'Vagon'
-df.loc[df['vagones'] > 0, 'carriage'] = 'Vagon'
+df.loc[df['vagones'] > 0, 'carriage'] = 'Vagones'
 
-# df.to_json('canchas.json', orient='records')
+df.to_json('canchas.json', orient='records')
 
 # def leyPonderada(x):
 #         return np.average(x, weights=df_main.loc[x.index, 'tonh'])

@@ -98,5 +98,7 @@ total_ton_prog_cumm = df3.query('timestamp < @nowTimestamp')['ton_prog'].sum()
 meta = {
     'total_ton_prog': total_ton_prog,
     'total_ton_ejec_cumm': total_ton_ejec_cumm,
-    'total_ton_prog_cumm': total_ton_prog_cumm
+    'total_ton_prog_cumm': total_ton_prog_cumm,
+    'percent_ejec': total_ton_ejec_cumm  * 100 / total_ton_prog,
+    'percent_prog': total_ton_prog_cumm * 100 / total_ton_prog
 }

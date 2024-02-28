@@ -601,11 +601,20 @@ def geo_analysisIn():
     total_ton_prog = df3['ton_prog'].sum()
     total_ton_ejec_cumm = df3.query('timestamp < @nowTimestamp')['tonh'].sum()
     total_ton_prog_cumm = df3.query('timestamp < @nowTimestamp')['ton_prog'].sum()
-
+    df4 = df3.fillna(0)
     meta = {
-        'total_ton_prog': total_ton_prog,
-        'total_ton_ejec_cumm': total_ton_ejec_cumm,
-        'total_ton_prog_cumm': total_ton_prog_cumm
+        'ton': {
+            'total_ton_prog': total_ton_prog,
+            'total_ton_ejec_cumm': total_ton_ejec_cumm,
+            'total_ton_prog_cumm': total_ton_prog_cumm,
+            'percent_ejec': total_ton_ejec_cumm  * 100 / total_ton_prog,
+            'percent_prog': total_ton_prog_cumm * 100 / total_ton_prog
+        },
+        'ley_ag': {
+            'ley_prog': np.average(df4['ley_prog'], weights=df4['ton_prog']),
+            'ley_prog_cumm': np.average(df4.query('timestamp < @nowTimestamp')['ley_prog'], weights=df4.query('timestamp < @nowTimestamp')['ton_prog']),
+            'ley_ejec_cumm': np.average(df4.query('timestamp < @nowTimestamp')['ley_ag'], weights=df4.query('timestamp < @nowTimestamp')['tonh']),
+        }
     }
     
     result = df3.to_dict('records')
@@ -617,6 +626,7 @@ def geo_analysisIn():
 @app.route('/analysisOut', methods=['GET'])
 def geo_analysisOut():
     ts = request.args.get('ts')
+    mining = request.args.get('mining')
     months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
     idxMonth = datetime.fromtimestamp(int(ts)).month - 1
     month = months[idxMonth]
