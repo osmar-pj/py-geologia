@@ -12,47 +12,55 @@ client = MongoClient(os.getenv('MONGO_URI'))
 
 db = client['wapsi']
 pd.set_option('display.max_columns', None)
+
+def moda_data(data):
+    isArray = isinstance(data, list)
+    if not isArray:
+        return data
+    data_count = {}
+    max_count = 0
+    moda = 0
+    for i in data:
+        if i in data_count:
+            data_count[i] += 1
+        else:
+            data_count[i] = 1 
+    for key, value in data_count.items():
+        if value > max_count:
+            moda = key
+            max_count = value  
+    return moda
+
 # timestamp = 1625097600
-ts = '1704234233'
-mining = 'YUMPAG'
-months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+ts = '1706509758'
+arr = ['turn', 'tajo']
+category = 'planta'
+
+months = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE']
 idxMonth = datetime.fromtimestamp(int(ts)).month - 1
 month = months[idxMonth]
 year = datetime.fromtimestamp(int(ts)).year
-print(month, year)
 
 trips = db['plantas']
 df_trips = pd.DataFrame(list(trips.find()))
 df_trips['_id'] = df_trips['_id'].astype(str)
-
-df_prog = pd.read_csv('../data/prog_planta.csv')
-df_finos = pd.read_csv('../data/finos_planta.csv')
-df_lab = pd.read_csv('../data/lab_planta.csv')
-
-df_prog.fillna(np.nan, inplace=True)
-df_finos.fillna(np.nan, inplace=True)
-df_lab.fillna(np.nan, inplace=True)
-
-df_prog.replace(np.nan, None, inplace=True)
-df_finos.replace(np.nan, None, inplace=True)
-df_lab.replace(np.nan, None, inplace=True)
-
-df_prog['date'] = pd.to_datetime(df_prog['date'])
-df_finos['date'] = pd.to_datetime(df_finos['date'])
-df_lab['date'] = pd.to_datetime(df_lab['date'])
-
+fixed = ['year','month']
+if category == "planta":
+        df_trips['dominio'] = df_trips['dominio'].apply(lambda x: moda_data(x))
+        df_trips['tajo'] = df_trips['tajo'].apply(lambda x: moda_data(x))
+        df_trips['zona'] = df_trips['zona'].apply(lambda x: moda_data(x))
+        df_trips['veta'] = df_trips['veta'].apply(lambda x: moda_data(x))
 def leyPonderada(x):
         return np.average(x, weights=df_trips.loc[x.index, 'tonh'])
 
-df_planta = df_trips.groupby('date').agg({'ton': 'sum', 'tonh': 'sum', 'ley_ag': leyPonderada, 'ley_fe': leyPonderada, 'ley_mn': leyPonderada, 'ley_pb': leyPonderada, 'ley_zn': leyPonderada}).reset_index()
+# grouped is concat fixed and arr
+grouped = fixed + arr
+values = ['tonh', 'ley_ag', 'ley_fe', 'ley_mn', 'ley_pb', 'ley_zn']
+df_body = df_trips.groupby(grouped).agg({'tonh': 'sum', 'ley_ag': leyPonderada, 'ley_fe': leyPonderada, 'ley_mn': leyPonderada, 'ley_pb': leyPonderada, 'ley_zn': leyPonderada}).reset_index()
 
-# # concat all dataframes
-df_planta = df_planta.merge(df_prog, on='date', how='left')
-df_planta = df_planta.merge(df_finos, on='date', how='left')
-df_planta = df_planta.merge(df_lab, on='date', how='left')
-df_planta['month'] = df_planta['date'].dt.month
-df_planta['month'] = df_planta['month'].apply(lambda x: months[x-1])
-df_planta['year'] = df_planta['date'].dt.year
-df_planta['timestamp'] = df_planta['date'].apply(lambda x: x.timestamp())  
-
-_df = df_planta[(df_planta['month'] == month) & (df_planta['year'] == year)]
+df_bodyFiltered = df_body[( df_body['year'] == year) & (df_body['month'] == month)]
+df_footer = df_bodyFiltered.groupby("year").agg({'tonh': 'sum', 'ley_ag': leyPonderada, 'ley_fe': leyPonderada, 'ley_mn': leyPonderada, 'ley_pb': leyPonderada, 'ley_zn': leyPonderada}).reset_index()
+# concat body and footer
+df_footer['year'] = "TOTAL"
+_df = pd.concat([df_bodyFiltered, df_footer])
+_df.replace(np.nan, None, inplace=True)

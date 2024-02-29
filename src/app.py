@@ -545,12 +545,54 @@ def geo_analysis():
         df_footer['year'] = "TOTAL"
         _df = pd.concat([df_bodyFiltered, df_footer])
         _df.replace(np.nan, None, inplace=True)
-        print(_df, i)
         body = _df.to_dict('records')
         data.append({"body": body})
 
     return jsonify({
         "data": data
+    })
+
+
+@app.route('/analysis/planta', methods=['POST'])
+def geo_analysis_planta():
+    # Para la tabla dinamica
+    data = request.get_json()
+    ts = data['ts']
+    category = data['category']
+    arr = data['arr']
+    
+    months = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE']
+    idxMonth = datetime.fromtimestamp(int(ts)).month - 1
+    month = months[idxMonth]
+    year = datetime.fromtimestamp(int(ts)).year
+
+    trips = db['plantas']
+    df_trips = pd.DataFrame(list(trips.find()))
+    df_trips['_id'] = df_trips['_id'].astype(str)
+    fixed = ['year','month']
+    if category == "planta":
+            df_trips['dominio'] = df_trips['dominio'].apply(lambda x: moda_data(x))
+            df_trips['tajo'] = df_trips['tajo'].apply(lambda x: moda_data(x))
+            df_trips['zona'] = df_trips['zona'].apply(lambda x: moda_data(x))
+            df_trips['veta'] = df_trips['veta'].apply(lambda x: moda_data(x))
+    def leyPonderada(x):
+            return np.average(x, weights=df_trips.loc[x.index, 'tonh'])
+
+    # grouped is concat fixed and arr
+    grouped = fixed + arr
+    values = ['tonh', 'ley_ag', 'ley_fe', 'ley_mn', 'ley_pb', 'ley_zn']
+    df_body = df_trips.groupby(grouped).agg({'tonh': 'sum', 'ley_ag': leyPonderada, 'ley_fe': leyPonderada, 'ley_mn': leyPonderada, 'ley_pb': leyPonderada, 'ley_zn': leyPonderada}).reset_index()
+
+    df_bodyFiltered = df_body[( df_body['year'] == year) & (df_body['month'] == month)]
+    df_footer = df_bodyFiltered.groupby("year").agg({'tonh': 'sum', 'ley_ag': leyPonderada, 'ley_fe': leyPonderada, 'ley_mn': leyPonderada, 'ley_pb': leyPonderada, 'ley_zn': leyPonderada}).reset_index()
+    # concat body and footer
+    df_footer['year'] = "TOTAL"
+    _df = pd.concat([df_bodyFiltered, df_footer])
+    _df.replace(np.nan, None, inplace=True)
+    body = _df.to_dict('records')
+
+    return jsonify({
+        "data": body
     })
 
 @app.route('/analysisIn', methods=['GET'])
@@ -565,25 +607,24 @@ def geo_analysisIn():
     trips = db['trips']
     df_trips = pd.DataFrame(list(trips.find()))
     df_trips['_id'] = df_trips['_id'].astype(str)
-    df_main= df_trips.query('status != "Planta" and (statusTrip == "waitDateAbastecimiento" or statusTrip == "waitBeginDespacho")')
-    df_prog = pd.read_csv('./data/prog_canchas.csv')
+
+    prog = db['prog_canchas']
+    df_prog = pd.DataFrame(list(prog.find()))
+    df_prog['_id'] = df_prog['_id'].astype(str)
     df_prog['date'] = pd.to_datetime(df_prog['date'])
-    df_prog['month'] = df_prog['date'].dt.month
-    df_prog['year'] = df_prog['date'].dt.year
-    df_prog['month'] = df_prog['month'].apply(lambda x: months[x-1])
-    df_prog['ton_prog'] = df_prog['ton_prog'].apply(lambda x: x.replace(',', '') if isinstance(x, str) else x)
-    df_prog['ton_prog'] = df_prog['ton_prog'].astype(float)
+    df_prog.sort_values(by=['date'], inplace=True)
+
     year = datetime.fromtimestamp(int(ts)).year
     def leyPonderada(x):
-            return np.average(x, weights=df_main.loc[x.index, 'tonh'])
-    df1 = df_main.query('month == @month and year == @year and mining == @mining').groupby(['date']).agg({'tonh': 'sum', 'ley_ag': leyPonderada, 'ley_fe': leyPonderada, 'ley_mn': leyPonderada, 'ley_pb': leyPonderada, 'ley_zn': leyPonderada}).reset_index()
+            return np.average(x, weights=df_trips.loc[x.index, 'tonh'])
+    df1 = df_trips.query('month == @month and year == @year and mining == @mining').groupby(['date']).agg({'tonh': 'sum', 'ley_ag': leyPonderada, 'ley_fe': leyPonderada, 'ley_mn': leyPonderada, 'ley_pb': leyPonderada, 'ley_zn': leyPonderada}).reset_index()
 
     df1['date'] = pd.to_datetime(df1['date'], format='%d/%m/%Y')
     df2 = df_prog.query('month == @month and year == @year and mining == @mining')
 
     if len(df2) == 0:
         df3 = df1.copy()
-        df3['timestamp'] = df3['date'].apply(lambda x: x.timestamp())  
+        df3['timestamp'] = df3['date'].apply(lambda x: x.timestamp())
         df3['ton_prog'] = 0
         df3['ley_prog'] = 0
         df3.sort_values(by=['timestamp'], inplace=True)
@@ -601,20 +642,73 @@ def geo_analysisIn():
     total_ton_prog = df3['ton_prog'].sum()
     total_ton_ejec_cumm = df3.query('timestamp < @nowTimestamp')['tonh'].sum()
     total_ton_prog_cumm = df3.query('timestamp < @nowTimestamp')['ton_prog'].sum()
+
     df4 = df3.fillna(0)
+    df5 = df4.query('timestamp < @nowTimestamp').copy()
+
+    total_ley_ag_prog = np.average(df4['ley_ag_prog'], weights=df4['ton_prog'])
+    total_ley_ag_prog_cumm = np.average(df5['ley_ag_prog'], weights=df5['ton_prog'])
+    total_ley_ag_ejec_cumm = np.average(df5['ley_ag'], weights=df5['tonh'])
+
+    total_ley_fe_prog = np.average(df4['ley_fe_prog'], weights=df4['ton_prog'])
+    total_ley_fe_prog_cumm = np.average(df5['ley_fe_prog'], weights=df5['ton_prog'])
+    total_ley_fe_ejec_cumm = np.average(df5['ley_fe'], weights=df5['tonh'])
+
+    total_ley_mn_prog = np.average(df4['ley_mn_prog'], weights=df4['ton_prog'])
+    total_ley_mn_prog_cumm = np.average(df5['ley_mn_prog'], weights=df5['ton_prog'])
+    total_ley_mn_ejec_cumm = np.average(df5['ley_mn'], weights=df5['tonh'])
+
+    total_ley_pb_prog = np.average(df4['ley_pb_prog'], weights=df4['ton_prog'])
+    total_ley_pb_prog_cumm = np.average(df5['ley_pb_prog'], weights=df5['ton_prog'])
+    total_ley_pb_ejec_cumm = np.average(df5['ley_pb'], weights=df5['tonh'])
+
+    total_ley_zn_prog = np.average(df4['ley_zn_prog'], weights=df4['ton_prog'])
+    total_ley_zn_prog_cumm = np.average(df5['ley_zn_prog'], weights=df5['ton_prog'])
+    total_ley_zn_ejec_cumm = np.average(df5['ley_zn'], weights=df5['tonh'])
+
     meta = {
         'ton': {
             'total_ton_prog': total_ton_prog,
             'total_ton_ejec_cumm': total_ton_ejec_cumm,
             'total_ton_prog_cumm': total_ton_prog_cumm,
-            'percent_ejec': total_ton_ejec_cumm  * 100 / total_ton_prog,
+            'percent_ejec': total_ton_ejec_cumm * 100 / total_ton_prog,
             'percent_prog': total_ton_prog_cumm * 100 / total_ton_prog
         },
         'ley_ag': {
-            'ley_prog': np.average(df4['ley_prog'], weights=df4['ton_prog']),
-            'ley_prog_cumm': np.average(df4.query('timestamp < @nowTimestamp')['ley_prog'], weights=df4.query('timestamp < @nowTimestamp')['ton_prog']),
-            'ley_ejec_cumm': np.average(df4.query('timestamp < @nowTimestamp')['ley_ag'], weights=df4.query('timestamp < @nowTimestamp')['tonh']),
-        }
+            'total_ley_prog': total_ley_ag_prog,
+            'total_ley_ejec_cumm': total_ley_ag_ejec_cumm,
+            'total_ley_prog_cumm': total_ley_ag_prog_cumm,
+            'percent_ejec': total_ley_ag_ejec_cumm * 100 / total_ley_ag_prog,
+            'percent_prog': total_ley_ag_prog_cumm * 100 / total_ley_ag_prog
+        },
+        'ley_fe': {
+            'total_ley_prog': total_ley_fe_prog,
+            'total_ley_ejec_cumm': total_ley_fe_ejec_cumm,
+            'total_ley_prog_cumm': total_ley_fe_prog_cumm,
+            'percent_ejec': total_ley_fe_ejec_cumm * 100 / total_ley_fe_prog,
+            'percent_prog': total_ley_fe_prog_cumm * 100 / total_ley_fe_prog
+        },
+        'ley_mn': {
+            'total_ley_prog': total_ley_mn_prog,
+            'total_ley_ejec_cumm': total_ley_mn_ejec_cumm,
+            'total_ley_prog_cumm': total_ley_mn_prog_cumm,
+            'percent_ejec': total_ley_mn_ejec_cumm * 100 / total_ley_mn_prog,
+            'percent_prog': total_ley_mn_prog_cumm * 100 / total_ley_mn_prog
+        },
+        'ley_pb': {
+            'total_ley_prog': total_ley_pb_prog,
+            'total_ley_ejec_cumm': total_ley_pb_ejec_cumm,
+            'total_ley_prog_cumm': total_ley_pb_prog_cumm,
+            'percent_ejec': total_ley_pb_ejec_cumm * 100 / total_ley_pb_prog,
+            'percent_prog': total_ley_pb_prog_cumm * 100 / total_ley_pb_prog
+        },
+        'ley_zn': {
+            'total_ley_prog': total_ley_zn_prog,
+            'total_ley_ejec_cumm': total_ley_zn_ejec_cumm,
+            'total_ley_prog_cumm': total_ley_zn_prog_cumm,
+            'percent_ejec': total_ley_zn_ejec_cumm * 100 / total_ley_zn_prog,
+            'percent_prog': total_ley_zn_prog_cumm * 100 / total_ley_zn_prog
+        },
     }
     
     result = df3.to_dict('records')
@@ -627,7 +721,8 @@ def geo_analysisIn():
 def geo_analysisOut():
     ts = request.args.get('ts')
     mining = request.args.get('mining')
-    months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+
+    months = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO','JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE','DICIEMBRE']
     idxMonth = datetime.fromtimestamp(int(ts)).month - 1
     month = months[idxMonth]
     year = datetime.fromtimestamp(int(ts)).year
