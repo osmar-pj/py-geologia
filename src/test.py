@@ -48,8 +48,12 @@ pointValues = {
     'vp_zn': 13.76,
 }
 
-ts = '1709140036'
-mining = 'UCHUCCHACUA'
+# timestamp = 1625097600
+# ts = '1706509758'
+ts = '1706763600' # FEBRERO
+# ts = '1704085200' # ENERO
+# ts = '1704085200' # MARZO
+mining = "YUMPAG"
 
 months = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO','JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE','DICIEMBRE']
 idxMonth = datetime.fromtimestamp(int(ts)).month - 1
@@ -68,7 +72,10 @@ df_prog.sort_values(by=['date'], inplace=True)
 year = datetime.fromtimestamp(int(ts)).year
 def leyPonderada(x):
         return np.average(x, weights=df_trips.loc[x.index, 'tonh'])
-df1 = df_trips.query('month == @month and year == @year and mining == @mining').groupby(['date']).agg({'tonh': 'sum', 'ley_ag': leyPonderada, 'ley_fe': leyPonderada, 'ley_mn': leyPonderada, 'ley_pb': leyPonderada, 'ley_zn': leyPonderada}).reset_index()
+# get just date in df['date]
+df_trips['date'] = df_trips['date'].apply(lambda x: x.strftime('%d/%m/%Y'))
+df_trips_filtered = df_trips.query('month == @month and year == @year and mining == @mining').dropna(subset=['ley_ag', 'ley_fe', 'ley_mn', 'ley_pb', 'ley_zn'])
+df1 = df_trips_filtered.groupby(['date']).agg({'tonh': 'sum', 'ley_ag': leyPonderada, 'ley_fe': leyPonderada, 'ley_mn': leyPonderada, 'ley_pb': leyPonderada, 'ley_zn': leyPonderada}).reset_index()
 
 df1['date'] = pd.to_datetime(df1['date'], format='%d/%m/%Y')
 df2 = df_prog.query('month == @month and year == @year and mining == @mining')
@@ -77,7 +84,11 @@ if len(df2) == 0:
     df3 = df1.copy()
     df3['timestamp'] = df3['date'].apply(lambda x: x.timestamp())
     df3['ton_prog'] = 0
-    df3['ley_prog'] = 0
+    df3['ley_ag_prog'] = 0
+    df3['ley_fe_prog'] = 0
+    df3['ley_mn_prog'] = 0
+    df3['ley_pb_prog'] = 0
+    df3['ley_zn_prog'] = 0
     df3.sort_values(by=['timestamp'], inplace=True)
 else:
     df3 = pd.merge(df2, df1, on='date', how='left')
@@ -94,7 +105,6 @@ total_ton_prog = df3['ton_prog'].sum()
 total_ton_ejec_cumm = df3.query('timestamp < @nowTimestamp')['tonh'].sum()
 total_ton_prog_cumm = df3.query('timestamp < @nowTimestamp')['ton_prog'].sum()
 
-# df4 temp to calculate leyes
 df4 = df3.fillna(0)
 df5 = df4.query('timestamp < @nowTimestamp').copy()
 

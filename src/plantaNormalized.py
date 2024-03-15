@@ -1,4 +1,15 @@
+from datetime import datetime
+from pymongo import MongoClient
+from datetime import datetime, timedelta
 import pandas as pd
+import numpy as np
+import os
+
+from dotenv import load_dotenv
+load_dotenv()
+client = MongoClient(os.getenv('MONGO_URI'))
+
+db = client['wapsi']
 
 df = pd.read_csv('../data/planta.csv')
 
@@ -31,3 +42,10 @@ df['tajo'] = df['tajo'].replace(['Tj 500-8P-S1'], 'TJ 500-8P-S1')
 # Dominio, tajo, zona, veta se guardara en el controlador NODE formato ARRAY
 
 df.to_json('planta.json', orient='records')
+
+# piles = db['pilas']
+# df_piles = pd.DataFrame(list(piles.find()))
+# df_piles['_id'] = df_piles['_id'].astype(str)
+
+# get mining of df_piles and add to df considering cod_tableta are in both dataframes
+# df['mining'] = df['cod_tableta'].apply(lambda x: df_piles[df_piles['cod_tableta'] == x]['mining'].values[0] if len(df_piles[df_piles['cod_tableta'] == x]['mining'].values) > 0 else None)
